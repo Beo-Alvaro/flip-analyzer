@@ -1,0 +1,1 @@
+"""House flip deal analyzer."""
