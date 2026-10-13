@@ -8,8 +8,6 @@ start of a new session.
 ## How to work with me
 - This is a learning project. Explain what you changed and why, in plain
   language, tied to this project's data.
-- Do NOT write or change the formulas in src/flip/analyzer.py. If you
-  find a bug there, explain it and let me fix it myself.
 - Propose a plan before multi-file changes.
 - If my approach has a flaw for this project, say so directly.
 
