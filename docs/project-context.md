@@ -8,8 +8,11 @@
 1. Single-deal calculation: analyze() for one property  (done)
 2. Scenario analysis: Base / Conservative / Stress (vary renovation cost,
    ARV, holding period) + max offer  (done)
-3. Many deals in a pandas DataFrame, same logic across rows  <- current step
+3. Many deals in a pandas DataFrame, same logic across rows  (done:
+   src/flip/batch.py runs analyze() per row; blank CSV cells use
+   analyze()'s defaults)
 4. Split into tables: properties, renovations, financing, holding_costs, sale
+   <- current step
 Reason: the calculation decides which fields the tables need.
 
 ## Cost waterfall

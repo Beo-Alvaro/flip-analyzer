@@ -1,0 +1,8 @@
+# SAMPLE DATA: made-up deals for demonstration only, not real listings or prices.
+deal_id,description,purchase_price,arv,renovation_cost,holding_months,monthly_holding_cost,loan_ratio,annual_interest_rate,zonal_value,fair_market_value
+SAMPLE-01,Anchor deal (hand-calculated),2800000,4200000,450000,6,15000,0.70,0.09,,
+SAMPLE-02,Small condo bought with cash,1900000,2600000,220000,4,12000,0,0,,
+SAMPLE-03,Large house with 12-month renovation,3500000,5300000,900000,12,18000,0.70,0.085,,
+SAMPLE-04,Zonal value above expected price,2400000,3400000,300000,6,12000,0.70,0.09,3800000,
+SAMPLE-05,Bargain needing heavy renovation,1600000,3300000,850000,8,14000,0.60,0.095,,
+SAMPLE-06,Overpriced townhouse,4600000,5200000,350000,6,20000,0.70,0.09,,
