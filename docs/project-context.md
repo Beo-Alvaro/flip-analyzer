@@ -5,10 +5,10 @@
 2. What are the expected net profit and ROI?
 
 ## Build order (decided)
-1. Single-deal calculation: analyze() for one property  <- current step
-2. Scenario analysis: Base / Conservative / Stress (vary purchase price,
-   renovation cost, ARV, holding period)
-3. Many deals in a pandas DataFrame, same logic across rows
+1. Single-deal calculation: analyze() for one property  (done)
+2. Scenario analysis: Base / Conservative / Stress (vary renovation cost,
+   ARV, holding period) + max offer  (done)
+3. Many deals in a pandas DataFrame, same logic across rows  <- current step
 4. Split into tables: properties, renovations, financing, holding_costs, sale
 Reason: the calculation decides which fields the tables need.
 
@@ -39,10 +39,23 @@ Inputs: purchase 2,800,000 | ARV 4,200,000 | renovation 450,000
 | ROI on total cost     | ~7.81%     |
 | Cash-on-cash ROI      | ~19.53%    |
 
+## Scenarios (assumptions, defined in src/flip/scenarios.py)
+| Scenario     | ARV  | Renovation | Holding   | Anchor net profit |
+|--------------|------|------------|-----------|-------------------|
+| Base         | as is| as is      | as is     | 304,200           |
+| Conservative | -5%  | +10%       | +2 months | 8,700             |
+| Stress       | -10% | +25%       | +4 months | -309,300          |
+
+Purchase price is NOT varied: once signed it is known, the one number
+the buyer decides. Instead, max offer = highest purchase price that
+still breaks even under Stress. Anchor deal: ~2,514,799 vs 2,800,000
+asking (the 70% rule gives 2,490,000 for comparison).
+
 ## Division of labor
-- I write: analyze(), the cost waterfall, ROI definitions
-- Claude Code does: repo scaffolding, tests for edge cases (no loan,
-  12-month hold, ARV below cost), scenario runner, Excel export,
+- I decide: the cost waterfall, ROI definitions, assumptions; I review
+  all calculation code
+- Claude Code does: analyze() (written by Claude, reviewed by me), repo
+  scaffolding, tests for edge cases, scenario runner, Excel export,
   README, git commits
 
 ## Known edge cases to handle
