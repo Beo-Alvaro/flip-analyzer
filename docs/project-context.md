@@ -17,7 +17,11 @@
    Holding costs and sale have one row per house, so they stay in
    properties. A house with no loan offers gets analyze()'s default terms,
    labeled "default terms". Unknown or repeated deal_ids are errors.
-Next: Excel export, README.
+Excel export (done: src/flip/export.py). Writes values, not live Excel
+formulas: Python is the tested source of truth and Excel is the report.
+Sample inputs -> SAMPLE banner on every sheet + SAMPLE_ file name.
+Output goes to output/ (gitignored).
+Next: README.
 Reason: the calculation decides which fields the tables need.
 
 ## Cost waterfall
