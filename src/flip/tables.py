@@ -92,15 +92,17 @@ def print_report(properties: pd.DataFrame, renovations: pd.DataFrame,
         items = renovations[renovations["deal_id"] == deal_id]
         if items.empty:
             print("    (no items)")
+        item_width = max([30] + [len(str(name)) + 2 for name in items["item"]])
         for _, item in items.iterrows():
-            print(f"    {item['item']:<30}{item['cost']:>12,.0f}")
-        print(f"    {'Total':<30}{items['cost'].sum():>12,.0f}")
+            print(f"    {item['item']:<{item_width}}{item['cost']:>12,.0f}")
+        print(f"    {'Total':<{item_width}}{items['cost'].sum():>12,.0f}")
         print()
 
         offers = analyzed[analyzed["deal_id"] == deal_id]
+        width = max([15] + [len(str(name)) + 2 for name in offers["offer"]])
 
         def row(label, values):
-            print(f"    {label:<20}" + "".join(f"{v:>15}" for v in values))
+            print(f"    {label:<20}" + "".join(f"{v:>{width}}" for v in values))
 
         def loan(o):
             if o["loan_ratio"] == 0:
@@ -114,7 +116,7 @@ def print_report(properties: pd.DataFrame, renovations: pd.DataFrame,
             return "none" if pd.isna(value) else f"{value:,.0f}"
 
         rows = [o for _, o in offers.iterrows()]
-        print(f"  {'Loan offers':<22}" + "".join(f"{o['offer']:>15}" for o in rows))
+        print(f"  {'Loan offers':<22}" + "".join(f"{o['offer']:>{width}}" for o in rows))
         row("Loan", [loan(o) for o in rows])
         row("Loan fee", [fee(o) for o in rows])
         row("Net profit", [pesos(o["net_profit"]) for o in rows])
