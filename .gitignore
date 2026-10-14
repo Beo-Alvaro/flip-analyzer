@@ -5,6 +5,9 @@ __pycache__/
 .venv/
 .pytest_cache/
 
+# Your real deals: kept out of git so they stay private if the repo is public
+data/deals_input.xlsx
+
 # Generated reports (Excel export lands here)
 output/
 ~$*.xlsx

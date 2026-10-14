@@ -21,6 +21,16 @@ Excel export (done: src/flip/export.py). Writes values, not live Excel
 formulas: Python is the tested source of truth and Excel is the report.
 Sample inputs -> SAMPLE banner on every sheet + SAMPLE_ file name.
 Output goes to output/ (gitignored).
+Excel input workbook (done: src/flip/template.py, inputs.py, comps.py).
+`python -m flip.template` creates data/deals_input.xlsx: Instructions,
+Properties, Renovations, Loan offers, Comps sheets, a note on every
+column, Excel typing checks. Data type cell (SAMPLE/REAL) drives the
+SAMPLE banner; REAL with SAMPLE-* rows left in is an error. All inputs
+(CSV or Excel) pass check_inputs(): blanks, text in number columns,
+rates typed as 9 instead of 9%, negatives, unknown deal_ids, with
+spreadsheet row numbers. Suggested ARV = median comp price per sqm x
+floor area; shown next to the user's ARV, never replaces it.
+Not modeled yet: loan prepayment penalties (would change analyze()).
 Next: README.
 Reason: the calculation decides which fields the tables need.
 

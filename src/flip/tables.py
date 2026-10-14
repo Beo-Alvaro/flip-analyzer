@@ -16,7 +16,7 @@ import inspect
 import pandas as pd
 
 from flip.analyzer import analyze
-from flip.batch import analyze_deals, file_notes, load_deals
+from flip.batch import analyze_deals
 
 LOAN_COLUMNS = ["loan_ratio", "annual_interest_rate", "loan_fee_rate"]
 DEFAULT_TERMS = "default terms"
@@ -69,11 +69,24 @@ def build_deals(properties: pd.DataFrame, renovations: pd.DataFrame,
 
 
 def print_report(properties: pd.DataFrame, renovations: pd.DataFrame,
-                 analyzed: pd.DataFrame) -> None:
-    """Print each house's renovation budget and its loan offers side by side."""
+                 analyzed: pd.DataFrame, suggestions: pd.DataFrame | None = None) -> None:
+    """Print each house's renovation budget and its loan offers side by side.
+
+    suggestions (from comps.suggested_arv) adds a line comparing your ARV
+    with the ARV suggested by the house's comps.
+    """
     for _, house in properties.iterrows():
         deal_id = house["deal_id"]
         print(f"{deal_id}  {house.get('description', '')}")
+
+        if suggestions is not None:
+            s = suggestions[suggestions["deal_id"] == deal_id].iloc[0]
+            if pd.isna(s["suggested_arv"]):
+                reason = "no comps" if s["comps_used"] == 0 else "no floor area"
+                print(f"  ARV: yours {house['arv']:,.0f} | suggested: none ({reason})")
+            else:
+                print(f"  ARV: yours {house['arv']:,.0f} | suggested {s['suggested_arv']:,.0f} "
+                      f"from {s['comps_used']} comps (median {s['median_price_per_sqm']:,.0f}/sqm)")
 
         print("  Renovation budget")
         items = renovations[renovations["deal_id"] == deal_id]
@@ -114,17 +127,34 @@ def print_report(properties: pd.DataFrame, renovations: pd.DataFrame,
 
 
 if __name__ == "__main__":
+    import sys
+
+    from flip.comps import suggested_arv
+    from flip.inputs import SAMPLE_BANNER, InputError, load_csv_inputs, load_excel_inputs
+
     parser = argparse.ArgumentParser(description="Renovation budgets and loan offer comparison.")
+    parser.add_argument("--input", help="Excel input workbook (from python -m flip.template); "
+                                        "replaces the CSV options")
     parser.add_argument("--properties", default="data/sample_properties.csv")
     parser.add_argument("--renovations", default="data/sample_renovations.csv")
     parser.add_argument("--loan-offers", default="data/sample_loan_offers.csv")
+    parser.add_argument("--comps", help="optional comps CSV")
     args = parser.parse_args()
 
-    paths = [args.properties, args.renovations, args.loan_offers]
-    for note in dict.fromkeys(n for p in paths for n in file_notes(p)):  # each note once
-        print(note)
-    print()
+    try:
+        if args.input:
+            inputs = load_excel_inputs(args.input)
+        else:
+            inputs = load_csv_inputs(args.properties, args.renovations, args.loan_offers,
+                                     args.comps)
+    except InputError as error:
+        sys.exit(str(error))
 
-    properties, renovations, loan_offers = (load_deals(p) for p in paths)
-    analyzed = analyze_deals(build_deals(properties, renovations, loan_offers))
-    print_report(properties, renovations, analyzed)
+    if inputs.sample:
+        print(SAMPLE_BANNER)
+        print()
+    analyzed = analyze_deals(build_deals(inputs.properties, inputs.renovations,
+                                         inputs.loan_offers))
+    has_comps = inputs.comps is not None and not inputs.comps.empty
+    suggestions = suggested_arv(inputs.properties, inputs.comps) if has_comps else None
+    print_report(inputs.properties, inputs.renovations, analyzed, suggestions)

@@ -4,7 +4,8 @@ Python calculates; Excel only displays. Every number comes from analyze(),
 so it matches the hand-calculated tests. Editing a cell in Excel does not
 recalculate anything: change the CSV files and export again.
 
-Run `python -m flip.export` to export the sample tables to output/.
+Run `python -m flip.export` to export the sample CSV tables to output/, or
+`python -m flip.export --input data/deals_input.xlsx` for the input workbook.
 """
 
 import argparse
@@ -15,12 +16,11 @@ from pathlib import Path
 import pandas as pd
 from openpyxl.styles import Alignment, Font, PatternFill
 
-from flip.batch import analyze_deals, deal_inputs, file_notes, load_deals
+from flip.batch import analyze_deals, deal_inputs
+from flip.comps import suggested_arv
+from flip.inputs import SAMPLE_BANNER, InputError, Inputs, load_csv_inputs, load_excel_inputs
 from flip.scenarios import SCENARIOS, apply_scenario, run_scenarios
 from flip.tables import ANALYZE_DEFAULTS, build_deals
-
-SAMPLE_BANNER = ("SAMPLE DATA: made-up deals for demonstration only. "
-                 "Not real listings, prices, renovation quotes, or bank terms.")
 
 # Excel number formats. The part after ";" is for negative numbers.
 PESOS = "#,##0;[Red]-#,##0"
@@ -58,6 +58,17 @@ COLUMNS = {
     "cash_on_cash_roi": ("Cash-on-cash ROI", ROI),
     "stress_net_profit": ("Stress net profit", PESOS),
     "max_offer_stress": ("Max offer (Stress)", PESOS),
+    "suggested_arv": ("Suggested ARV (comps)", PESOS),
+    "floor_area_sqm": ("Floor area (sqm)", None),
+    "lot_area_sqm": ("Lot area (sqm)", None),
+    "source_url": ("Listing", None),
+    "subdivision": ("Subdivision", None),
+    "link": ("Link", None),
+    "type": ("Type", None),
+    "price": ("Price", PESOS),
+    "price_per_sqm": ("Price per sqm", PESOS),
+    "condition": ("Condition", None),
+    "date_seen": ("Date seen", "yyyy-mm-dd"),
 }
 
 
@@ -84,7 +95,7 @@ def scenario_table(deals: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def about_table(paths: list[str]) -> pd.DataFrame:
+def about_table(paths: list[str], has_comps: bool = False) -> pd.DataFrame:
     """The About sheet: what the workbook is and the assumptions behind it."""
     d = ANALYZE_DEFAULTS
     rows = [
@@ -111,6 +122,10 @@ def about_table(paths: list[str]) -> pd.DataFrame:
                      "A habitual flipper may be taxed as an ordinary asset instead; "
                      "see docs/glossary.md."),
     ]
+    if has_comps:
+        rows.append(("Suggested ARV (comps)",
+                     "Median price per sqm of the house's comps x its floor area. Shown "
+                     "next to the ARV you entered; all calculations use your ARV."))
     for name, s in SCENARIOS.items():
         rows.append((f"Scenario: {name}",
                      f"ARV {s['arv_change']:+.0%}, renovation {s['renovation_change']:+.0%}, "
@@ -118,34 +133,43 @@ def about_table(paths: list[str]) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=["Topic", "Details"])
 
 
-def build_sheets(properties: pd.DataFrame, renovations: pd.DataFrame,
-                 loan_offers: pd.DataFrame, paths: list[str]) -> dict[str, pd.DataFrame]:
+def build_sheets(inputs: Inputs) -> dict[str, pd.DataFrame]:
     """All sheets of the workbook, in order: {sheet name: table}."""
-    deals = build_deals(properties, renovations, loan_offers)
+    deals = build_deals(inputs.properties, inputs.renovations, inputs.loan_offers)
     analyzed = analyze_deals(deals)
+    has_comps = inputs.comps is not None and not inputs.comps.empty
 
-    summary = analyzed[[
-        "deal_id", "description", "offer", "purchase_price", "arv", "renovation_cost",
-        "net_profit", "roi_on_total_cost", "cash_on_cash_roi", "cash_invested",
-        "stress_net_profit", "max_offer_stress",
-    ]].copy()
+    columns = ["deal_id", "description", "offer", "purchase_price", "arv", "renovation_cost",
+               "net_profit", "roi_on_total_cost", "cash_on_cash_roi", "cash_invested",
+               "stress_net_profit", "max_offer_stress"]
+    summary = analyzed[[c for c in columns if c in analyzed.columns]].copy()
     summary["max_offer_stress"] = summary["max_offer_stress"].apply(
         lambda v: "no safe price" if pd.isna(v) else v)
+    if has_comps:
+        suggestions = suggested_arv(inputs.properties, inputs.comps).set_index("deal_id")
+        summary.insert(summary.columns.get_loc("arv") + 1, "suggested_arv",
+                       summary["deal_id"].map(suggestions["suggested_arv"]))
 
     waterfall = analyzed[[
         "deal_id", "offer", "purchase_price", "acquisition", "renovation_cost",
         "interest", "loan_fees", "holding", "selling", "total_cost", "arv", "net_profit",
     ]]
 
-    return {
-        "About": about_table(paths),
+    sheets = {
+        "About": about_table(inputs.sources, has_comps),
         "Summary": summary,
         "Cost waterfall": waterfall,
         "Scenarios": scenario_table(deals),
-        "Properties": properties,
-        "Renovations": renovations,
-        "Loan offers": loan_offers,
+        "Properties": inputs.properties,
+        "Renovations": inputs.renovations,
+        "Loan offers": inputs.loan_offers,
     }
+    if has_comps:
+        comps = inputs.comps.copy()
+        comps.insert(comps.columns.get_loc("price") + 1, "price_per_sqm",
+                     comps["price"] / comps["floor_area_sqm"])
+        sheets["Comps"] = comps
+    return sheets
 
 
 def write_workbook(sheets: dict[str, pd.DataFrame], path: Path, sample: bool) -> None:
@@ -183,34 +207,48 @@ def write_workbook(sheets: dict[str, pd.DataFrame], path: Path, sample: bool) ->
                     row[0].alignment = Alignment(wrap_text=True, vertical="top")
 
 
-def export(properties_path, renovations_path, loan_offers_path, output_dir="output") -> Path:
-    """Analyze the three tables and write the workbook. Returns its path.
+def export_inputs(inputs: Inputs, output_dir="output") -> Path:
+    """Analyze the inputs and write the workbook. Returns its path.
 
-    If any input file is labeled SAMPLE DATA, every sheet gets the SAMPLE
-    banner and the file name starts with SAMPLE_.
+    SAMPLE data gets the SAMPLE banner on every sheet and a file name
+    starting with SAMPLE_.
     """
-    paths = [properties_path, renovations_path, loan_offers_path]
-    sample = any("SAMPLE DATA" in note for p in paths for note in file_notes(p))
-    properties, renovations, loan_offers = (load_deals(p) for p in paths)
-
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    path = output_dir / ("SAMPLE_flip_analysis.xlsx" if sample else "flip_analysis.xlsx")
+    name = "SAMPLE_flip_analysis.xlsx" if inputs.sample else "flip_analysis.xlsx"
+    path = output_dir / name
 
-    write_workbook(build_sheets(properties, renovations, loan_offers, paths), path, sample)
+    write_workbook(build_sheets(inputs), path, inputs.sample)
     return path
+
+
+def export(properties_path, renovations_path, loan_offers_path, output_dir="output",
+           comps_path=None) -> Path:
+    """Export from CSV tables. Data is SAMPLE if any file has the SAMPLE label."""
+    inputs = load_csv_inputs(properties_path, renovations_path, loan_offers_path, comps_path)
+    return export_inputs(inputs, output_dir)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Export the analysis to an Excel workbook.")
+    parser.add_argument("--input", help="Excel input workbook (from python -m flip.template); "
+                                        "replaces the CSV options")
     parser.add_argument("--properties", default="data/sample_properties.csv")
     parser.add_argument("--renovations", default="data/sample_renovations.csv")
     parser.add_argument("--loan-offers", default="data/sample_loan_offers.csv")
+    parser.add_argument("--comps", help="optional comps CSV")
     parser.add_argument("--output-dir", default="output")
     args = parser.parse_args()
 
     try:
-        path = export(args.properties, args.renovations, args.loan_offers, args.output_dir)
+        if args.input:
+            inputs = load_excel_inputs(args.input)
+        else:
+            inputs = load_csv_inputs(args.properties, args.renovations, args.loan_offers,
+                                     args.comps)
+        path = export_inputs(inputs, args.output_dir)
+    except InputError as error:
+        sys.exit(str(error))
     except PermissionError as error:
         sys.exit(f"Can't write {error.filename}. If it is open in Excel, close it and run again.")
     print(f"Wrote {path}")

@@ -32,7 +32,9 @@ numbers exactly, and every later feature is checked against it.
 |---|---|---|
 | Renovation cost | 450,000 | Repairs and improvements. |
 | ARV (After Repair Value) | 4,200,000 | The expected selling price after renovation. This is the most important estimate in the model. |
-| Comps (comparables) | n/a | Similar renovated properties nearby, used to estimate ARV. Stored in `data/comps.csv`. |
+| Comps (comparables) | n/a | Similar renovated properties nearby, used to estimate ARV. Entered on the Comps sheet of the input workbook. Use renovated resale homes of the same type: brand-new developer units sell for more and overstate ARV. |
+| Suggested ARV | n/a | Median comp price per sqm × the house's floor area. Shown next to your ARV as a check; it never replaces it. |
+| Median | n/a | The middle value when numbers are sorted (for an even count, the average of the middle two). Used instead of the average so one unusual comp can't pull the estimate up on its own. |
 | Holding period | 6 months | How long you own the property, from purchase to sale. |
 | Holding costs | 90,000 | Ongoing costs of owning the property: utilities, association dues, real property tax, security. 15,000/month × 6. |
 

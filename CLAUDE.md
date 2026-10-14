@@ -26,7 +26,10 @@ start of a new session.
 - Broker commission 3% of selling price
 
 ## Data
-- data/comps.csv: hand-collected comparables from PH listing sites
+- data/deals_input.xlsx: the user's real deals, entered in the Excel
+  input workbook (created by `python -m flip.template`). Gitignored so
+  real deals stay private. Comps are hand-collected from PH listing
+  sites and entered on its Comps sheet (or a comps CSV via --comps)
 - data/sample_deals.csv: SAMPLE data, must stay labeled as sample
   (one row per house; used by src/flip/batch.py)
 - data/sample_properties.csv, sample_renovations.csv,
