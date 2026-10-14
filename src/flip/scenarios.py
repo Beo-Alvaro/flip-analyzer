@@ -62,15 +62,20 @@ def max_offer(deal: dict, scenario: str = "Stress", min_profit: float = 0) -> fl
     return low
 
 
-def print_scenarios(deal: dict) -> None:
-    """Print the deal's scenarios side by side, plus the max offer."""
+def print_scenarios(deal: dict, min_profit: float = 200_000) -> None:
+    """Print the deal's scenarios side by side, plus max offers.
+
+    Shows two max offers per scenario: the most you can pay to break even,
+    and the most you can pay to still earn min_profit.
+    """
     results = run_scenarios(deal)
     inputs = {name: apply_scenario(deal, s) for name, s in SCENARIOS.items()}
 
     def row(label, values, fmt):
-        print(f"{label:<20}" + "".join(f"{v:>15{fmt}}" for v in values))
+        cells = (f"{'none':>15}" if v is None else f"{v:>15{fmt}}" for v in values)
+        print(f"{label:<28}" + "".join(cells))
 
-    print(f"{'':<20}" + "".join(f"{name:>15}" for name in SCENARIOS))
+    print(f"{'':<28}" + "".join(f"{name:>15}" for name in SCENARIOS))
     row("ARV", [inputs[n]["arv"] for n in SCENARIOS], ",.0f")
     row("Renovation", [inputs[n]["renovation_cost"] for n in SCENARIOS], ",.0f")
     row("Holding months", [inputs[n]["holding_months"] for n in SCENARIOS], "d")
@@ -80,16 +85,21 @@ def print_scenarios(deal: dict) -> None:
     row("ROI on total cost", [results[n]["roi_on_total_cost"] for n in SCENARIOS], ".2%")
     row("Cash-on-cash ROI", [results[n]["cash_on_cash_roi"] for n in SCENARIOS], ".2%")
 
-    offer = max_offer(deal)
     print()
-    print(f"Purchase price:                     {deal['purchase_price']:>12,.0f}")
-    if offer is None:
-        print("Max offer (break even in Stress):   none, loses money at any price")
-    else:
-        print(f"Max offer (break even in Stress):   {offer:>12,.0f}")
+    print(f"{'Purchase price (asking)':<28}{deal['purchase_price']:>15,.0f}")
+    row("Max offer: break even", [max_offer(deal, n) for n in SCENARIOS], ",.0f")
+    row(f"Max offer: {min_profit:,.0f} profit",
+        [max_offer(deal, n, min_profit) for n in SCENARIOS], ",.0f")
 
 
 if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Scenarios for the anchor deal.")
+    parser.add_argument("--min-profit", type=float, default=200_000,
+                        help="profit target for the second max offer (default 200,000)")
+    args = parser.parse_args()
+
     # Anchor deal from docs/project-context.md
     print_scenarios(dict(
         purchase_price=2_800_000,
@@ -97,4 +107,4 @@ if __name__ == "__main__":
         renovation_cost=450_000,
         holding_months=6,
         monthly_holding_cost=15_000,
-    ))
+    ), min_profit=args.min_profit)

@@ -87,6 +87,25 @@ def test_max_offer_breaks_even_under_stress():
     assert max_offer(ANCHOR) == pytest.approx(2_514_799.45, abs=1)
 
 
+# Max offer = (ARV - costs that don't depend on price) - min profit,
+# divided by what each peso of price costs in total:
+#   Base:         ARV 4,200,000 - (450,000 + 90,000 + 378,000)  = 3,282,000
+#                 per peso 1 + 0.025 + 0.70 x 9% x 6/12 + 0.007  = 1.0635
+#   Conservative: ARV 3,990,000 - (495,000 + 120,000 + 359,100) = 3,015,900
+#                 per peso 1 + 0.025 + 0.70 x 9% x 8/12 + 0.007  = 1.074
+#   Stress:       ARV 3,780,000 - (562,500 + 150,000 + 340,200) = 2,727,300
+#                 per peso 1 + 0.025 + 0.70 x 9% x 10/12 + 0.007 = 1.0845
+@pytest.mark.parametrize("scenario, min_profit, expected", [
+    ("Base", 0, 3_086_036.67),  # 3,282,000 / 1.0635
+    ("Conservative", 0, 2_808_100.56),  # 3,015,900 / 1.074
+    ("Base", 200_000, 2_897_978.37),  # 3,082,000 / 1.0635
+    ("Conservative", 200_000, 2_621_880.82),  # 2,815,900 / 1.074
+    ("Stress", 200_000, 2_330_382.66),  # 2,527,300 / 1.0845
+])
+def test_max_offer_for_each_scenario_and_profit_target(scenario, min_profit, expected):
+    assert max_offer(ANCHOR, scenario, min_profit) == pytest.approx(expected, abs=1)
+
+
 def test_max_offer_for_the_anchor_profit_is_the_anchor_price():
     # The anchor deal earns 304,200 at 2,800,000 in Base, so the highest
     # price that still earns 304,200 must be 2,800,000.
