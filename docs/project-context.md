@@ -31,7 +31,10 @@ rates typed as 9 instead of 9%, negatives, unknown deal_ids, with
 spreadsheet row numbers. Suggested ARV = median comp price per sqm x
 floor area; shown next to the user's ARV, never replaces it.
 Not modeled yet: loan prepayment penalties (would change analyze()).
-Next: README.
+README (done). Includes the Imus Pag-IBIG case study without the
+address or property ID; delete that section if it shouldn't be public.
+Possible next: break-even sale price / purchase price in the report,
+prepayment penalty, itemized monthly holding costs, publish to GitHub.
 Reason: the calculation decides which fields the tables need.
 
 ## Cost waterfall
