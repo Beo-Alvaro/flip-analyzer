@@ -1,0 +1,5 @@
+# SAMPLE DATA: made-up properties for demonstration only, not real listings or prices.
+deal_id,description,purchase_price,arv,holding_months,monthly_holding_cost,zonal_value,fair_market_value
+SAMPLE-01,Anchor deal (hand-calculated),2800000,4200000,6,15000,,
+SAMPLE-02,Bargain needing heavy renovation,1600000,3300000,8,14000,,
+SAMPLE-03,Small condo with light refresh (no loan offers yet),1900000,2600000,4,12000,,

@@ -1,0 +1,18 @@
+# SAMPLE DATA: made-up renovation budgets for demonstration only, not real quotes.
+deal_id,item,cost
+SAMPLE-01,Roof and ceiling repair,90000
+SAMPLE-01,Kitchen,120000
+SAMPLE-01,Bathroom,80000
+SAMPLE-01,Electrical and plumbing,70000
+SAMPLE-01,Paint and finishes,60000
+SAMPLE-01,Flooring,30000
+SAMPLE-02,Structural repairs,250000
+SAMPLE-02,Roof replacement,180000
+SAMPLE-02,Kitchen,150000
+SAMPLE-02,Two bathrooms,120000
+SAMPLE-02,Electrical rewiring,90000
+SAMPLE-02,Paint and finishes,60000
+SAMPLE-03,Paint,60000
+SAMPLE-03,Kitchen cabinets,80000
+SAMPLE-03,Flooring,50000
+SAMPLE-03,Fixtures and lighting,30000

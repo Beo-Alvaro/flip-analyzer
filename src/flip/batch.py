@@ -17,8 +17,12 @@ INPUT_COLUMNS = list(inspect.signature(analyze).parameters)
 
 
 def load_deals(path) -> pd.DataFrame:
-    """Read a deals CSV. Lines starting with # are notes, like the SAMPLE label."""
-    return pd.read_csv(path, comment="#")
+    """Read a CSV, skipping the # note lines at the top (like the SAMPLE label).
+
+    Only the top lines are skipped, so a # inside a value ("Bathroom #2")
+    is kept.
+    """
+    return pd.read_csv(path, skiprows=len(file_notes(path)))
 
 
 def file_notes(path) -> list[str]:

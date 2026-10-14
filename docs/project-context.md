@@ -11,8 +11,13 @@
 3. Many deals in a pandas DataFrame, same logic across rows  (done:
    src/flip/batch.py runs analyze() per row; blank CSV cells use
    analyze()'s defaults)
-4. Split into tables: properties, renovations, financing, holding_costs, sale
-   <- current step
+4. Split into tables (done: src/flip/tables.py). Built as 3 tables, not
+   the 5 first planned: properties, renovations (itemized budget, many
+   per house), loan_offers (many per house, compared side by side).
+   Holding costs and sale have one row per house, so they stay in
+   properties. A house with no loan offers gets analyze()'s default terms,
+   labeled "default terms". Unknown or repeated deal_ids are errors.
+Next: Excel export, README.
 Reason: the calculation decides which fields the tables need.
 
 ## Cost waterfall

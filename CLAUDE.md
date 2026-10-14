@@ -28,3 +28,8 @@ start of a new session.
 ## Data
 - data/comps.csv: hand-collected comparables from PH listing sites
 - data/sample_deals.csv: SAMPLE data, must stay labeled as sample
+  (one row per house; used by src/flip/batch.py)
+- data/sample_properties.csv, sample_renovations.csv,
+  sample_loan_offers.csv: SAMPLE data, must stay labeled as sample
+  (split tables; used by src/flip/tables.py)
+- Sample label = a "# SAMPLE DATA: ..." first line; tests enforce it

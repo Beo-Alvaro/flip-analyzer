@@ -1,0 +1,7 @@
+# SAMPLE DATA: made-up loan offers for demonstration only, not real bank terms.
+deal_id,offer,loan_ratio,annual_interest_rate,loan_fee_rate
+SAMPLE-01,Bank A,0.70,0.09,0.01
+SAMPLE-01,Bank B,0.80,0.10,0.015
+SAMPLE-01,Cash,0,0,0
+SAMPLE-02,Bank A,0.60,0.095,0.01
+SAMPLE-02,Bank C,0.70,0.085,0.02
