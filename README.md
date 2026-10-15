@@ -135,6 +135,21 @@ Please fix these in your input:
   - Comps row 2 (SAMPLE-1): deal_id SAMPLE-1 is not on the Properties sheet (typo?)
 ```
 
+### The web app (no terminal needed after starting it)
+
+```bash
+pip install -e ".[web]"
+python -m flip.web
+```
+
+It opens in your browser at http://localhost:8501 and reads
+`data/deals_input.xlsx` (or a workbook you upload). Pick a house and a
+loan offer to see the verdict, the key numbers, charts of the scenarios,
+what matters most, and where the money goes, the ARV check, costs, and
+the checklist. A **What-if** panel tries different numbers on screen
+without touching your workbook, and the sidebar downloads the Excel
+report. Stop it with Ctrl+C.
+
 ### Other commands
 
 | Command | What it does |
@@ -163,6 +178,8 @@ src/flip/
   inputs.py      load CSV or Excel input, check it for typing mistakes
   template.py    create the Excel input workbook
   export.py      write the formatted Excel report
+  app.py         the web app (Streamlit); web.py starts it
+  charts.py      web app charts, colorblind-safe in light and dark mode
 tests/           hand-calculated tests for every module
 data/            SAMPLE data (made up, labeled as such)
 docs/
@@ -185,7 +202,10 @@ docs/
   `analyze()`, so a fix in one place fixes every report.
 - **Excel shows values, not formulas.** Python is the tested source of
   truth; rewriting the math as Excel formulas would create a second,
-  untested copy.
+  untested copy. The web app follows the same rule: it calls the same
+  functions, and its tests check the same hand-calculated numbers.
+- **The web app never writes your workbook.** What-if changes live on
+  screen and in the downloaded report only.
 - **Max offer by binary search over `analyze()`** instead of a separate
   formula, so it stays correct if the cost model changes.
 - **Median, not average, for comps,** so one unusual listing can't pull the

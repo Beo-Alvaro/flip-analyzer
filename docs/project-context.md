@@ -55,7 +55,13 @@ before tax, 0), included in total cost but not cash invested. CWT is not
 modeled (creditable, not a cost).
 Applied to the user's deals: Imus legal 90,000 moved to Other costs, 10%
 contingency, worst 24 months; San Pablo 10% contingency, worst 16 months.
-Phase C: local web app (Streamlit, if it installs on Python 3.15).
+Phase C (done): local web app, `python -m flip.web` (Streamlit 1.66 on
+Python 3.15). app.py reads the workbook, never writes it; what-if inputs
+(price, ARV, months, worst months, monthly cost, contingency) apply on
+screen and in the downloaded report. charts.py: Altair charts with a
+palette validated for colorblind safety and contrast on Streamlit's light
+and dark backgrounds; every chart has a "See the numbers" table. Tested
+headless with Streamlit AppTest (tests/test_app.py).
 Still not modeled: loan prepayment penalty, amortizing loans.
 Reason: the calculation decides which fields the tables need.
 
