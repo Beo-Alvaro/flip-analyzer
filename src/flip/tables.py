@@ -16,7 +16,8 @@ import inspect
 import pandas as pd
 
 from flip.analyzer import analyze
-from flip.batch import analyze_deals
+from flip.batch import analyze_deals, deal_inputs
+from flip.decision import Settings, add_verdicts, checklist_status, sensitivity
 
 LOAN_COLUMNS = ["loan_ratio", "annual_interest_rate", "loan_fee_rate"]
 DEFAULT_TERMS = "default terms"
@@ -69,24 +70,21 @@ def build_deals(properties: pd.DataFrame, renovations: pd.DataFrame,
 
 
 def print_report(properties: pd.DataFrame, renovations: pd.DataFrame,
-                 analyzed: pd.DataFrame, suggestions: pd.DataFrame | None = None) -> None:
-    """Print each house's renovation budget and its loan offers side by side.
+                 analyzed: pd.DataFrame, suggestions: pd.DataFrame | None = None,
+                 settings: Settings | None = None,
+                 checklist: pd.DataFrame | None = None) -> None:
+    """Print each house's report: ARV check, renovation budget, loan offers
+    side by side, verdict, what matters most, and checklist.
 
-    suggestions (from comps.suggested_arv) adds a line comparing your ARV
-    with the ARV suggested by the house's comps.
+    suggestions (from comps.suggested_arv) adds the ARV check against comps.
     """
+    settings = settings or Settings()
     for _, house in properties.iterrows():
         deal_id = house["deal_id"]
         print(f"{deal_id}  {house.get('description', '')}")
 
         if suggestions is not None:
-            s = suggestions[suggestions["deal_id"] == deal_id].iloc[0]
-            if pd.isna(s["suggested_arv"]):
-                reason = "no comps" if s["comps_used"] == 0 else "no floor area"
-                print(f"  ARV: yours {house['arv']:,.0f} | suggested: none ({reason})")
-            else:
-                print(f"  ARV: yours {house['arv']:,.0f} | suggested {s['suggested_arv']:,.0f} "
-                      f"from {s['comps_used']} comps (median {s['median_price_per_sqm']:,.0f}/sqm)")
+            print_arv_check(house, suggestions[suggestions["deal_id"] == deal_id].iloc[0])
 
         print("  Renovation budget")
         items = renovations[renovations["deal_id"] == deal_id]
@@ -102,7 +100,7 @@ def print_report(properties: pd.DataFrame, renovations: pd.DataFrame,
         width = max([15] + [len(str(name)) + 2 for name in offers["offer"]])
 
         def row(label, values):
-            print(f"    {label:<20}" + "".join(f"{v:>{width}}" for v in values))
+            print(f"    {label:<24}" + "".join(f"{v:>{width}}" for v in values))
 
         def loan(o):
             if o["loan_ratio"] == 0:
@@ -113,19 +111,77 @@ def print_report(properties: pd.DataFrame, renovations: pd.DataFrame,
             return "-" if o["loan_ratio"] == 0 else f"{o['loan_fee_rate'] * 100:g}%"
 
         def pesos(value):
-            return "none" if pd.isna(value) else f"{value:,.0f}"
+            return "none" if value is None or pd.isna(value) else f"{value:,.0f}"
+
+        def percent(value):
+            return "-" if value is None or pd.isna(value) else f"{value:.2%}"
 
         rows = [o for _, o in offers.iterrows()]
-        print(f"  {'Loan offers':<22}" + "".join(f"{o['offer']:>{width}}" for o in rows))
+        print(f"  {'Loan offers':<26}" + "".join(f"{o['offer']:>{width}}" for o in rows))
         row("Loan", [loan(o) for o in rows])
         row("Loan fee", [fee(o) for o in rows])
         row("Net profit", [pesos(o["net_profit"]) for o in rows])
         row("Cash invested", [pesos(o["cash_invested"]) for o in rows])
-        row("ROI on total cost", [f"{o['roi_on_total_cost']:.2%}" for o in rows])
-        row("Cash-on-cash ROI", [f"{o['cash_on_cash_roi']:.2%}" for o in rows])
+        row("ROI on total cost", [percent(o["roi_on_total_cost"]) for o in rows])
+        row("Cash-on-cash ROI", [percent(o["cash_on_cash_roi"]) for o in rows])
+        row("Yearly ROI on total cost", [percent(o["yearly_roi_on_total_cost"]) for o in rows])
+        row("Yearly cash-on-cash ROI", [percent(o["yearly_cash_on_cash_roi"]) for o in rows])
+        row(f"vs {settings.safe_rate:.0%} safe account",
+            [f"{o['profit_vs_safe']:+,.0f}" for o in rows])
         row("Stress profit", [pesos(o["stress_net_profit"]) for o in rows])
         row("Max offer (Stress)", [pesos(o["max_offer_stress"]) for o in rows])
+        row("Break-even sale price", [pesos(o["break_even_arv"]) for o in rows])
+        row("Break-even price", [pesos(o["break_even_price"]) for o in rows])
         print()
+
+        if "verdict" in offers.columns:
+            print("  Verdict (against your Settings)")
+            for o in rows:
+                print(f"    {o['offer']}: {o['verdict']}")
+            print()
+
+        if rows:
+            first = rows[0]
+            table = sensitivity(deal_inputs(first))
+            print(f"  What matters most ({first['offer']}): profit if each input is "
+                  "10% lower / higher")
+            for _, s in table.iterrows():
+                print(f"    {s['input']:<24}{s['profit_if_lower']:>14,.0f}"
+                      f"{s['profit_if_higher']:>14,.0f}")
+            print()
+
+        if checklist is not None:
+            c = checklist_status(deal_id, checklist)
+            if not c["started"]:
+                print("  Checklist: not started (add this house's items on the Checklist sheet)")
+            else:
+                print(f"  Checklist: {c['done']} done, {c['open']} open, "
+                      f"{len(c['issues'])} issue(s)")
+                for issue in c["issues"]:
+                    print(f"    ! {issue}")
+            print()
+
+
+def print_arv_check(house: pd.Series, s: pd.Series) -> None:
+    """Your ARV next to what the comps suggest, plus any warnings."""
+    if pd.isna(s["suggested_arv"]):
+        reason = ("no floor area" if s["comps_used"] and pd.isna(house.get("floor_area_sqm"))
+                  else "no resale comps")
+        line = f"  ARV: yours {house['arv']:,.0f} | suggested: none ({reason})"
+    else:
+        line = (f"  ARV: yours {house['arv']:,.0f} | suggested {s['suggested_arv']:,.0f} "
+                f"(range {s['arv_low']:,.0f} to {s['arv_high']:,.0f}) from "
+                f"{s['comps_used']} resale comps")
+    print(line)
+    extras = []
+    if not pd.isna(s["new_unit_ceiling"]):
+        extras.append(f"new-unit ceiling {s['new_unit_ceiling']:,.0f}")
+    if not pd.isna(s["foreclosed_floor"]):
+        extras.append(f"foreclosed floor {s['foreclosed_floor']:,.0f}")
+    if extras:
+        print("       " + " | ".join(extras))
+    for warning in s["warnings"]:
+        print(f"    ! {warning}")
 
 
 if __name__ == "__main__":
@@ -156,7 +212,9 @@ if __name__ == "__main__":
         print(SAMPLE_BANNER)
         print()
     analyzed = analyze_deals(build_deals(inputs.properties, inputs.renovations,
-                                         inputs.loan_offers))
+                                         inputs.loan_offers), inputs.settings.safe_rate)
+    analyzed = add_verdicts(analyzed, inputs.settings, inputs.checklist)
     has_comps = inputs.comps is not None and not inputs.comps.empty
     suggestions = suggested_arv(inputs.properties, inputs.comps) if has_comps else None
-    print_report(inputs.properties, inputs.renovations, analyzed, suggestions)
+    print_report(inputs.properties, inputs.renovations, analyzed, suggestions,
+                 inputs.settings, inputs.checklist)

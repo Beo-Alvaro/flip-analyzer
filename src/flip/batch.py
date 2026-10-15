@@ -9,6 +9,8 @@ import inspect
 import pandas as pd
 
 from flip.analyzer import analyze
+from flip.decision import (Settings, break_even_arv, break_even_price, safe_earnings,
+                           yearly_return)
 from flip.scenarios import max_offer, run_scenarios
 
 # Columns a deals file may use: one per analyze() input, read from its
@@ -52,20 +54,32 @@ def deal_inputs(row: pd.Series) -> dict:
     }
 
 
-def analyze_deals(deals: pd.DataFrame) -> pd.DataFrame:
+def analyze_deals(deals: pd.DataFrame, safe_rate: float = Settings.safe_rate) -> pd.DataFrame:
     """Analyze every deal. Returns the deals table with result columns added.
 
     Besides analyze()'s results, each row gets:
         stress_net_profit: net profit if the Stress scenario happens
         max_offer_stress: highest price that still breaks even under Stress
                           (None if no price works)
+        break_even_arv: lowest sale price that breaks even as planned
+        break_even_price: highest purchase price that breaks even as planned
+        yearly_roi_on_total_cost, yearly_cash_on_cash_roi: both ROIs per year
+        safe_earnings: what the cash invested would earn at safe_rate
+        profit_vs_safe: net profit minus safe_earnings
     """
     results = []
     for _, row in deals.iterrows():
         inputs = deal_inputs(row)
         result = analyze(**inputs)
+        months = inputs["holding_months"]
         result["stress_net_profit"] = run_scenarios(inputs)["Stress"]["net_profit"]
         result["max_offer_stress"] = max_offer(inputs)
+        result["break_even_arv"] = break_even_arv(inputs)
+        result["break_even_price"] = break_even_price(inputs)
+        result["yearly_roi_on_total_cost"] = yearly_return(result["roi_on_total_cost"], months)
+        result["yearly_cash_on_cash_roi"] = yearly_return(result["cash_on_cash_roi"], months)
+        result["safe_earnings"] = safe_earnings(result["cash_invested"], months, safe_rate)
+        result["profit_vs_safe"] = result["net_profit"] - result["safe_earnings"]
         results.append(result)
 
     # "purchase" and "renovation" repeat the purchase_price and

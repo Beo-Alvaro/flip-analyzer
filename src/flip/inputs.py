@@ -11,6 +11,8 @@ import pandas as pd
 from openpyxl import load_workbook
 
 from flip.batch import file_notes, load_deals
+from flip.comps import KINDS
+from flip.decision import Settings
 
 SAMPLE_BANNER = ("SAMPLE DATA: made-up deals for demonstration only. "
                  "Not real listings, prices, renovation quotes, or bank terms.")
@@ -21,6 +23,7 @@ SHEETS = {
     "renovations": "Renovations",
     "loan_offers": "Loan offers",
     "comps": "Comps",
+    "checklist": "Checklist",
 }
 
 REQUIRED = {
@@ -28,6 +31,17 @@ REQUIRED = {
     "renovations": ["deal_id", "item", "cost"],
     "loan_offers": ["deal_id", "offer"],
     "comps": ["deal_id", "floor_area_sqm", "price"],
+    "checklist": ["deal_id", "item"],
+}
+
+CHECKLIST_STATUSES = ["open", "done", "issue"]
+
+# Settings sheet: setting name -> kind of value
+SETTING_KINDS = {
+    "safe_rate": "rate",
+    "min_profit": "pesos",
+    "min_yearly_return": "rate",
+    "price_within_stress_max_offer": "yes/no",
 }
 
 # Number columns and the values they allow
@@ -52,12 +66,16 @@ class Inputs:
     sources: list[str]
     # Spreadsheet row number of each table's first data row, for error messages
     first_rows: dict[str, int] = field(default_factory=dict)
+    settings: Settings = field(default_factory=Settings)
+    checklist: pd.DataFrame | None = None
 
     def tables(self) -> dict[str, pd.DataFrame]:
         tables = {"properties": self.properties, "renovations": self.renovations,
                   "loan_offers": self.loan_offers}
         if self.comps is not None:
             tables["comps"] = self.comps
+        if self.checklist is not None:
+            tables["checklist"] = self.checklist
         return tables
 
 
@@ -100,6 +118,22 @@ def check_inputs(inputs: Inputs) -> None:
                     problems.append(f"{where}: {column} can't be negative ({value:,})")
                 elif column in ABOVE_ZERO and value == 0:
                     problems.append(f"{where}: {column} must be more than 0")
+
+            if name == "comps" and "kind" in table.columns and not pd.isna(row["kind"]) \
+                    and str(row["kind"]).strip().lower() not in KINDS:
+                problems.append(f"{where}: kind is {row['kind']!r}; use one of "
+                                f"{', '.join(KINDS)} (or leave blank)")
+            if name == "comps" and "date_listed" in table.columns \
+                    and not pd.isna(row["date_listed"]):
+                try:
+                    pd.Timestamp(row["date_listed"])
+                except (ValueError, TypeError):
+                    problems.append(f"{where}: date_listed {row['date_listed']!r} is not a "
+                                    "date; type it like 2025-02-27")
+            if name == "checklist" and "status" in table.columns and not pd.isna(row["status"]) \
+                    and str(row["status"]).strip().lower() not in CHECKLIST_STATUSES:
+                problems.append(f"{where}: status is {row['status']!r}; use "
+                                f"{', '.join(CHECKLIST_STATUSES)}")
 
     if not inputs.sample:
         example_ids = sorted({
@@ -157,10 +191,52 @@ def data_type(workbook_path) -> str:
     return "SAMPLE"
 
 
+def read_settings(sheet: pd.DataFrame | None) -> Settings:
+    """Settings from the Settings sheet (columns: setting, value).
+
+    Settings that are missing or left blank keep their defaults.
+    """
+    settings = Settings()
+    if sheet is None:
+        return settings
+    problems = []
+    for index, row in sheet.dropna(how="all").iterrows():
+        name, value = str(row.get("setting", "")).strip(), row.get("value")
+        where = f"Settings row {index + 2} ({name})"
+        if name not in SETTING_KINDS:
+            problems.append(f"{where}: unknown setting; expected one of "
+                            f"{', '.join(SETTING_KINDS)}")
+            continue
+        if value is None or pd.isna(value):
+            continue
+        kind = SETTING_KINDS[name]
+        if kind == "yes/no":
+            answer = str(value).strip().upper()
+            if answer not in ("YES", "NO", "TRUE", "FALSE"):
+                problems.append(f"{where}: type YES or NO, got {value!r}")
+                continue
+            setattr(settings, name, answer in ("YES", "TRUE"))
+        elif not pd.api.types.is_number(value):
+            problems.append(f"{where}: must be a number, got {value!r}")
+        elif kind == "rate" and value > 1:
+            problems.append(f"{where}: is {value:g}. Did you mean {value:g}%? "
+                            f"Type it as {value:g}% or {value / 100:g}.")
+        elif value < 0:
+            problems.append(f"{where}: can't be negative ({value:,})")
+        else:
+            setattr(settings, name, float(value))
+    if problems:
+        raise InputError("Please fix these in your input:\n"
+                         + "\n".join(f"  - {p}" for p in problems))
+    return settings
+
+
 def load_excel_inputs(path) -> Inputs:
     """Load and check the Excel input workbook made by `python -m flip.template`."""
     sheets = pd.read_excel(path, sheet_name=None)
-    missing = [sheet for name, sheet in SHEETS.items() if name != "comps" and sheet not in sheets]
+    optional = ("comps", "checklist")
+    missing = [sheet for name, sheet in SHEETS.items()
+               if name not in optional and sheet not in sheets]
     if missing:
         raise InputError(f"{path} is missing sheet {', '.join(missing)}")
 
@@ -176,6 +252,8 @@ def load_excel_inputs(path) -> Inputs:
         sample=data_type(path) == "SAMPLE",
         sources=[str(path)],
         first_rows={name: 2 for name in tables},  # row 1 is the header
+        settings=read_settings(sheets.get("Settings")),
+        checklist=tables.get("checklist"),
     )
     check_inputs(inputs)
     return inputs

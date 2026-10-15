@@ -13,7 +13,9 @@ from flip.comps import suggested_arv
 from flip.export import SAMPLE_BANNER, export_inputs
 from flip.inputs import InputError, load_excel_inputs
 from flip.tables import build_deals
-from flip.template import DATA_TYPE_CELL, create_template
+from flip.decision import add_verdicts
+from flip.tables import print_report
+from flip.template import DATA_TYPE_CELL, create_template, upgrade_workbook
 
 
 def money(value):
@@ -39,7 +41,8 @@ def edit(path, changes):
 def test_template_sheets_and_data_type(template):
     wb = load_workbook(template)
 
-    assert wb.sheetnames == ["Instructions", "Properties", "Renovations", "Loan offers", "Comps"]
+    assert wb.sheetnames == ["Instructions", "Properties", "Renovations", "Loan offers", "Comps",
+                             "Checklist", "Settings"]
     assert wb["Instructions"][DATA_TYPE_CELL].value == "SAMPLE"
 
 
@@ -191,7 +194,7 @@ def test_export_shows_suggested_arv_and_comps(template, tmp_path):
 
 def test_real_data_exports_without_banner(template, tmp_path):
     wb = load_workbook(template)
-    for sheet in ["Properties", "Renovations", "Loan offers", "Comps"]:
+    for sheet in ["Properties", "Renovations", "Loan offers", "Comps", "Checklist"]:
         for row in wb[sheet].iter_rows(min_row=2, max_col=1):
             if row[0].value == "SAMPLE-01":
                 row[0].value = "IMUS-01"
@@ -201,3 +204,98 @@ def test_real_data_exports_without_banner(template, tmp_path):
     path = export_inputs(load_excel_inputs(template), tmp_path / "out")
     assert path.name == "flip_analysis.xlsx"
     assert load_workbook(path)["Summary"]["A1"].value == "Deal"
+
+
+# --- Phase A: comp kind, checklist, settings, upgrade, report ---
+# Comps columns: ... I date_seen, J kind, K date_listed. Checklist: C status.
+# Settings: B2 safe_rate, B3 min_profit, B4 min_yearly_return,
+# B5 price_within_stress_max_offer.
+
+def test_unknown_comp_kind(template):
+    edit(template, {("Comps", "J2"): "brand new"})
+
+    with pytest.raises(InputError, match="kind is 'brand new'; use one of resale, new, "
+                                         "foreclosed, pasalo"):
+        load_excel_inputs(template)
+
+
+def test_date_listed_must_be_a_date(template):
+    edit(template, {("Comps", "K2"): "last year"})
+
+    with pytest.raises(InputError, match="date_listed 'last year' is not a date"):
+        load_excel_inputs(template)
+
+
+def test_unknown_checklist_status(template):
+    edit(template, {("Checklist", "C2"): "maybe"})
+
+    with pytest.raises(InputError, match="Checklist row 2.*status is 'maybe'"):
+        load_excel_inputs(template)
+
+
+def test_settings_rate_typed_without_percent_sign(template):
+    edit(template, {("Settings", "B2"): 6})
+
+    with pytest.raises(InputError, match=r"Settings row 2 \(safe_rate\): is 6. Did you mean 6%"):
+        load_excel_inputs(template)
+
+
+def test_settings_are_read(template):
+    edit(template, {("Settings", "B2"): 0.05, ("Settings", "B3"): 100_000,
+                    ("Settings", "B5"): "NO"})
+    s = load_excel_inputs(template).settings
+
+    assert (s.safe_rate, s.min_profit, s.min_yearly_return) == (0.05, 100_000, 0.15)
+    assert s.price_within_stress_max_offer is False
+
+
+def test_upgrade_adds_new_sheets_and_columns_and_keeps_data(template):
+    # Make it look like a workbook from before Phase A
+    wb = load_workbook(template)
+    del wb["Checklist"], wb["Settings"]
+    wb["Comps"].delete_cols(10, 2)  # kind, date_listed
+    wb.save(template)
+
+    changes = upgrade_workbook(template)
+
+    assert changes == ["added column kind to Comps", "added column date_listed to Comps",
+                       "added sheet Checklist", "added sheet Settings"]
+    wb = load_workbook(template)
+    assert wb["Comps"]["G2"].value == 4_500_000  # existing comp kept
+    assert [wb["Comps"].cell(row=1, column=c).value for c in (10, 11)] == ["kind", "date_listed"]
+    inputs = load_excel_inputs(template)
+    assert inputs.checklist.empty
+    assert upgrade_workbook(template) == []  # already up to date
+
+
+def test_export_has_decision_columns_and_sheets(template, tmp_path):
+    wb = load_workbook(export_inputs(load_excel_inputs(template), tmp_path / "out"))
+
+    assert {"Sensitivity", "ARV check", "Checklist", "Settings"} <= set(wb.sheetnames)
+    headers = [c.value for c in wb["Summary"][3]]
+    bank_a = dict(zip(headers, [c.value for c in wb["Summary"][4]]))
+    assert bank_a["Break-even sale price"] == pytest.approx(3_517_800 / 0.91, abs=0.02)
+    assert bank_a["Profit vs safe account"] == money(257_466)  # 304,200 - 46,734
+    assert bank_a["Verdict"] == ("Fails: price is 285,201 above the max offer under Stress "
+                                 "(2,514,799) | checklist: 8 open, 0 issue(s)")
+    sens_headers = [c.value for c in wb["Sensitivity"][3]]
+    top = dict(zip(sens_headers, [c.value for c in wb["Sensitivity"][4]]))
+    assert (top["Loan offer"], top["Input"]) == ("Bank A", "Sale price (ARV)")
+    assert top["Swing"] == money(764_400)  # 2 x 382,200
+
+
+def test_report_prints_decision_sections(template, capsys):
+    inputs = load_excel_inputs(template)
+    analyzed = add_verdicts(analyze_deals(build_deals(inputs.properties, inputs.renovations,
+                                                      inputs.loan_offers)),
+                            inputs.settings, inputs.checklist)
+    print_report(inputs.properties, inputs.renovations, analyzed,
+                 suggested_arv(inputs.properties, inputs.comps), inputs.settings,
+                 inputs.checklist)
+    out = capsys.readouterr().out
+
+    assert "suggested 4,200,000 (range 4,032,000 to 4,368,000) from 3 resale comps" in out
+    assert "Break-even sale price" in out and "3,865,714" in out
+    assert "Bank A: Fails: price is 285,201 above the max offer under Stress" in out
+    assert "What matters most (Bank A)" in out
+    assert "Checklist: 0 done, 8 open, 0 issue(s)" in out

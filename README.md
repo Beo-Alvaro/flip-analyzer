@@ -20,7 +20,11 @@ transfer tax, and registration; 3% broker commission.
 | What if things go wrong? | Base, Conservative, and Stress scenarios |
 | What's the most I should pay? | Max offer: highest price that still breaks even (or earns a target profit) under Stress |
 | Which loan is better? | Loan offers side by side, including paying cash |
-| Is my sale price realistic? | Suggested ARV from comparable sales (median price per sqm x floor area) |
+| Is my sale price realistic? | Suggested ARV from resale comps (median price per sqm x floor area) with a low–high range; new units shown as a ceiling, foreclosures as a floor, pasalo prices left out; warnings for old, odd, or too few comps |
+| What does it need to sell for? | Break-even sale price and break-even purchase price |
+| Which estimate matters most? | Profit when each input is 10% lower or higher, ranked by swing |
+| Is it worth it vs. doing nothing? | Yearly ROI, and profit compared with a safe account at your rate |
+| Does it meet my rules? | A verdict against your own criteria (minimum profit, minimum yearly return, max offer) and a due-diligence checklist per house |
 
 ## Example: the anchor deal
 
@@ -107,9 +111,12 @@ python -m pytest
    python -m flip.template
    ```
    This makes `data/deals_input.xlsx` with sheets for Properties,
-   Renovations, Loan offers, and Comps. Every column header has a note
-   explaining what goes there and where to find it. It starts with the
-   anchor deal as example rows.
+   Renovations, Loan offers, Comps, a due-diligence Checklist, and
+   Settings (your criteria for a deal worth doing). Every column header
+   has a note explaining what goes there and where to find it. It starts
+   with the anchor deal as example rows. An older workbook can be brought
+   up to date without losing data:
+   `python -m flip.template --upgrade data/deals_input.xlsx`.
 2. Replace the example rows with your properties and set **Data type** to
    REAL on the Instructions sheet.
 3. Print the report, or export it to Excel:
@@ -138,8 +145,10 @@ Please fix these in your input:
 | `python -m flip.export` | Excel workbook from the sample CSV tables |
 
 The Excel export has sheets for About (assumptions and definitions),
-Summary, Cost waterfall, Scenarios, and the inputs. Pesos are formatted,
-losses are red, and sample data carries a SAMPLE banner on every sheet.
+Summary (with break-even points, yearly ROI, safe-account comparison, and
+the verdict), Cost waterfall, Scenarios, Sensitivity, ARV check, and the
+inputs. Pesos are formatted, losses are red, and sample data carries a
+SAMPLE banner on every sheet.
 
 ## Project layout
 
@@ -149,7 +158,8 @@ src/flip/
   scenarios.py   Base / Conservative / Stress, max offer
   batch.py       analyze() across every row of a pandas DataFrame
   tables.py      properties + renovation items + loan offers -> one row per offer
-  comps.py       suggested ARV from comparable sales
+  decision.py    break-even, what matters most, yearly ROI, safe account, verdict
+  comps.py       suggested ARV from comparable sales, by kind, with warnings
   inputs.py      load CSV or Excel input, check it for typing mistakes
   template.py    create the Excel input workbook
   export.py      write the formatted Excel report
@@ -179,7 +189,15 @@ docs/
 - **Max offer by binary search over `analyze()`** instead of a separate
   formula, so it stays correct if the cost model changes.
 - **Median, not average, for comps,** so one unusual listing can't pull the
-  ARV estimate up on its own.
+  ARV estimate up on its own. Only resale comps count; new units and
+  foreclosures bound the estimate instead, and pasalo prices are left out
+  because they are usually only the cash-out.
+- **Yearly ROI is simple, not compounded** (ROI x 12 / months), matching
+  how a savings rate is quoted, so a deal can be compared with a safe
+  account.
+- **The verdict checks your rules; it doesn't decide for you.** Minimum
+  profit, minimum yearly return, and the max-offer rule live on the
+  Settings sheet.
 - **Purchase price is not a scenario variable.** Once you sign, it is the
   one number you decide. The uncertainty is in sale price, renovation, and
   time; the max offer turns that into a price to negotiate toward.

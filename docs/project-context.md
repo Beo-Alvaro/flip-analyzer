@@ -33,8 +33,23 @@ floor area; shown next to the user's ARV, never replaces it.
 Not modeled yet: loan prepayment penalties (would change analyze()).
 README (done). Includes the Imus Pag-IBIG case study without the
 address or property ID; delete that section if it shouldn't be public.
-Possible next: break-even sale price / purchase price in the report,
-prepayment penalty, itemized monthly holding costs, publish to GitHub.
+
+## Improvement plan (after an honest review: "good screener, not yet a
+## decision tool")
+Phase A (done, no analyze() changes): decision.py (break-even sale price
+and purchase price, sensitivity ranking, yearly ROI = ROI x 12 / months,
+simple not compounded; profit vs safe account; verdict vs Settings sheet;
+checklist), comp kinds (resale counted; new = ceiling; foreclosed =
+floor; pasalo left out) with range and warnings, workbook Checklist and
+Settings sheets, `python -m flip.template --upgrade` keeps user data.
+Settings defaults: safe rate 6%, min profit 200,000, min yearly
+cash-on-cash 15%, price must be <= Stress max offer.
+Phase B (next, changes analyze(): needs user approval of formulas):
+contingency, Other costs sheet (eviction, arrears, title), price
+discount by payment mode, best/likely/worst holding months, business
+tax option with user-entered rates.
+Phase C: local web app (Streamlit, if it installs on Python 3.15).
+Still not modeled: loan prepayment penalty, amortizing loans.
 Reason: the calculation decides which fields the tables need.
 
 ## Cost waterfall

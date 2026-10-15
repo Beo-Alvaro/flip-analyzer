@@ -18,6 +18,7 @@ from openpyxl.styles import Alignment, Font, PatternFill
 
 from flip.batch import analyze_deals, deal_inputs
 from flip.comps import suggested_arv
+from flip.decision import add_verdicts, sensitivity
 from flip.inputs import SAMPLE_BANNER, InputError, Inputs, load_csv_inputs, load_excel_inputs
 from flip.scenarios import SCENARIOS, apply_scenario, run_scenarios
 from flip.tables import ANALYZE_DEFAULTS, build_deals
@@ -69,6 +70,32 @@ COLUMNS = {
     "price_per_sqm": ("Price per sqm", PESOS),
     "condition": ("Condition", None),
     "date_seen": ("Date seen", "yyyy-mm-dd"),
+    "kind": ("Kind", None),
+    "date_listed": ("Date listed", "yyyy-mm-dd"),
+    "break_even_arv": ("Break-even sale price", PESOS),
+    "break_even_price": ("Break-even price", PESOS),
+    "yearly_roi_on_total_cost": ("Yearly ROI on total cost", ROI),
+    "yearly_cash_on_cash_roi": ("Yearly cash-on-cash ROI", ROI),
+    "safe_earnings": ("Safe account earnings", PESOS),
+    "profit_vs_safe": ("Profit vs safe account", PESOS),
+    "verdict": ("Verdict", None),
+    "input": ("Input", None),
+    "profit_if_lower": ("Profit if 10% lower", PESOS),
+    "profit_if_higher": ("Profit if 10% higher", PESOS),
+    "swing": ("Swing", PESOS),
+    "comps_used": ("Resale comps used", None),
+    "low_price_per_sqm": ("Low per sqm", PESOS),
+    "median_price_per_sqm": ("Median per sqm", PESOS),
+    "high_price_per_sqm": ("High per sqm", PESOS),
+    "arv_low": ("ARV low", PESOS),
+    "arv_high": ("ARV high", PESOS),
+    "new_unit_ceiling": ("New-unit ceiling", PESOS),
+    "foreclosed_floor": ("Foreclosed floor", PESOS),
+    "warnings": ("Warnings", None),
+    "status": ("Status", None),
+    "note": ("Note", None),
+    "setting": ("Setting", None),
+    "value": ("Value", None),
 }
 
 
@@ -122,10 +149,25 @@ def about_table(paths: list[str], has_comps: bool = False) -> pd.DataFrame:
                      "A habitual flipper may be taxed as an ordinary asset instead; "
                      "see docs/glossary.md."),
     ]
+    rows += [
+        ("Yearly ROI", "Each ROI x 12 / holding months, so flips of different lengths "
+                       "can be compared. Simple, not compounded."),
+        ("Profit vs safe account", "Net profit minus what the cash invested would earn "
+                                   "in a safe account at your safe rate over the same months."),
+        ("Break-even sale price", "Lowest sale price at which the deal stops losing money."),
+        ("Break-even price", "Highest purchase price at which the deal still breaks even "
+                             "as planned."),
+        ("What matters most", "The Sensitivity sheet: profit when each input is 10% lower "
+                              "and 10% higher. The biggest swing is the number most worth "
+                              "getting right."),
+        ("Verdict", "Checks each deal against your Settings (minimum profit, minimum yearly "
+                    "return, safe account, max offer). It is not advice to buy."),
+    ]
     if has_comps:
         rows.append(("Suggested ARV (comps)",
-                     "Median price per sqm of the house's comps x its floor area. Shown "
-                     "next to the ARV you entered; all calculations use your ARV."))
+                     "Median price per sqm of the house's resale comps x its floor area. "
+                     "New units are a ceiling, foreclosures a floor, pasalo comps are left "
+                     "out. Shown next to the ARV you entered; all calculations use your ARV."))
     for name, s in SCENARIOS.items():
         rows.append((f"Scenario: {name}",
                      f"ARV {s['arv_change']:+.0%}, renovation {s['renovation_change']:+.0%}, "
@@ -136,19 +178,22 @@ def about_table(paths: list[str], has_comps: bool = False) -> pd.DataFrame:
 def build_sheets(inputs: Inputs) -> dict[str, pd.DataFrame]:
     """All sheets of the workbook, in order: {sheet name: table}."""
     deals = build_deals(inputs.properties, inputs.renovations, inputs.loan_offers)
-    analyzed = analyze_deals(deals)
+    analyzed = analyze_deals(deals, inputs.settings.safe_rate)
+    analyzed = add_verdicts(analyzed, inputs.settings, inputs.checklist)
     has_comps = inputs.comps is not None and not inputs.comps.empty
 
     columns = ["deal_id", "description", "offer", "purchase_price", "arv", "renovation_cost",
-               "net_profit", "roi_on_total_cost", "cash_on_cash_roi", "cash_invested",
-               "stress_net_profit", "max_offer_stress"]
+               "net_profit", "roi_on_total_cost", "cash_on_cash_roi",
+               "yearly_roi_on_total_cost", "yearly_cash_on_cash_roi", "cash_invested",
+               "profit_vs_safe", "stress_net_profit", "max_offer_stress",
+               "break_even_arv", "break_even_price", "verdict"]
     summary = analyzed[[c for c in columns if c in analyzed.columns]].copy()
-    summary["max_offer_stress"] = summary["max_offer_stress"].apply(
-        lambda v: "no safe price" if pd.isna(v) else v)
+    for column in ["max_offer_stress", "break_even_price"]:
+        summary[column] = summary[column].apply(lambda v: "no safe price" if pd.isna(v) else v)
     if has_comps:
-        suggestions = suggested_arv(inputs.properties, inputs.comps).set_index("deal_id")
+        checks = suggested_arv(inputs.properties, inputs.comps)
         summary.insert(summary.columns.get_loc("arv") + 1, "suggested_arv",
-                       summary["deal_id"].map(suggestions["suggested_arv"]))
+                       summary["deal_id"].map(checks.set_index("deal_id")["suggested_arv"]))
 
     waterfall = analyzed[[
         "deal_id", "offer", "purchase_price", "acquisition", "renovation_cost",
@@ -160,16 +205,38 @@ def build_sheets(inputs: Inputs) -> dict[str, pd.DataFrame]:
         "Summary": summary,
         "Cost waterfall": waterfall,
         "Scenarios": scenario_table(deals),
-        "Properties": inputs.properties,
-        "Renovations": inputs.renovations,
-        "Loan offers": inputs.loan_offers,
+        "Sensitivity": sensitivity_table(deals),
     }
+    if has_comps:
+        checks["warnings"] = checks["warnings"].apply("; ".join)
+        sheets["ARV check"] = checks
+    sheets["Properties"] = inputs.properties
+    sheets["Renovations"] = inputs.renovations
+    sheets["Loan offers"] = inputs.loan_offers
     if has_comps:
         comps = inputs.comps.copy()
         comps.insert(comps.columns.get_loc("price") + 1, "price_per_sqm",
                      comps["price"] / comps["floor_area_sqm"])
         sheets["Comps"] = comps
+    if inputs.checklist is not None:
+        sheets["Checklist"] = inputs.checklist
+    s = inputs.settings
+    sheets["Settings"] = pd.DataFrame({
+        "setting": ["safe_rate", "min_profit", "min_yearly_return",
+                    "price_within_stress_max_offer"],
+        "value": [f"{s.safe_rate:.1%}", f"{s.min_profit:,.0f}", f"{s.min_yearly_return:.1%}",
+                  "YES" if s.price_within_stress_max_offer else "NO"],
+    })
     return sheets
+
+
+def sensitivity_table(deals: pd.DataFrame) -> pd.DataFrame:
+    """What matters most, for every house and loan offer."""
+    rows = []
+    for _, deal in deals.iterrows():
+        for _, s in sensitivity(deal_inputs(deal)).iterrows():
+            rows.append({"deal_id": deal["deal_id"], "offer": deal["offer"], **s.to_dict()})
+    return pd.DataFrame(rows)
 
 
 def write_workbook(sheets: dict[str, pd.DataFrame], path: Path, sample: bool) -> None:

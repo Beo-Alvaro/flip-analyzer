@@ -33,7 +33,9 @@ numbers exactly, and every later feature is checked against it.
 | Renovation cost | 450,000 | Repairs and improvements. |
 | ARV (After Repair Value) | 4,200,000 | The expected selling price after renovation. This is the most important estimate in the model. |
 | Comps (comparables) | n/a | Similar renovated properties nearby, used to estimate ARV. Entered on the Comps sheet of the input workbook. Use renovated resale homes of the same type: brand-new developer units sell for more and overstate ARV. |
-| Suggested ARV | n/a | Median comp price per sqm × the house's floor area. Shown next to your ARV as a check; it never replaces it. |
+| Suggested ARV | n/a | Median **resale** comp price per sqm × the house's floor area, with a low–high range. Shown next to your ARV as a check; it never replaces it. |
+| Comp kind | n/a | **resale** (existing home sold outright: the best comp), **new** (brand-new developer unit: a ceiling, since a renovated resale rarely sells for more), **foreclosed** (bank or Pag-IBIG: an as-is floor), **pasalo** (loan takeover: left out, because the listed price is usually only the cash-out). |
+| Pasalo | n/a | Taking over someone's home loan. The listed "price" is the cash-out for payments already made; the buyer also takes over the remaining loan. The house's real price is the total contract price (TCP). |
 | Median | n/a | The middle value when numbers are sorted (for an even count, the average of the middle two). Used instead of the average so one unusual comp can't pull the estimate up on its own. |
 | Holding period | 6 months | How long you own the property, from purchase to sale. |
 | Holding costs | 90,000 | Ongoing costs of owning the property: utilities, association dues, real property tax, security. 15,000/month × 6. |
@@ -60,6 +62,15 @@ numbers exactly, and every later feature is checked against it.
 | Cash-on-cash ROI | ~19.53% | Net profit ÷ cash invested. Answers: *is this a good use of my own money?* |
 
 Both ROIs cover the whole holding period. They are not annual rates.
+
+| Term | Anchor deal | Meaning |
+|---|---|---|
+| Yearly ROI | 15.62% / 39.06% | Each ROI × 12 ÷ holding months, so flips of different lengths can be compared. Simple, not compounded: 19.53% over 6 months is 39.06% per year. |
+| Safe account | +257,466 | Net profit minus what the cash invested would earn in a safe account (bank deposit, Pag-IBIG MP2) at your safe rate over the same months: 1,557,800 × 6% × 6/12 = 46,734. |
+| Break-even sale price | 3,865,714 | Lowest sale price at which the deal stops losing money: 3,517,800 of other costs ÷ 0.91 (9% of the sale goes to broker and CGT). |
+| Break-even price | 3,086,037 | Highest purchase price at which the deal still breaks even as planned. |
+| What matters most | ARV first | Profit when each input is 10% lower and 10% higher. The input with the biggest swing is the one most worth getting right. For the anchor deal, a 10% ARV miss moves profit by 382,200 either way. |
+| Verdict | Fails | "Meets your criteria" or "Fails: reasons", checked against the Settings sheet (minimum profit, minimum yearly return, safe account, max offer). It is a check against your rules, not advice to buy. |
 
 ### Checking the profit by following the money
 

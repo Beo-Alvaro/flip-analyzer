@@ -24,8 +24,8 @@ anchor,Bank B,0.80,0.10,0.015
 anchor,Cash,0,0,0
 """
 
-SHEETS = ["About", "Summary", "Cost waterfall", "Scenarios", "Properties",
-          "Renovations", "Loan offers"]
+SHEETS = ["About", "Summary", "Cost waterfall", "Scenarios", "Sensitivity", "Properties",
+          "Renovations", "Loan offers", "Settings"]
 
 
 def write_inputs(folder, label="# SAMPLE DATA: test\n", properties=PROPERTIES_CSV):
