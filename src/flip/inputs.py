@@ -11,6 +11,7 @@ import pandas as pd
 from openpyxl import load_workbook
 
 from flip.batch import file_notes, load_deals
+from flip.analyzer import TAX_MODES
 from flip.comps import KINDS
 from flip.decision import Settings
 
@@ -21,6 +22,7 @@ SAMPLE_BANNER = ("SAMPLE DATA: made-up deals for demonstration only. "
 SHEETS = {
     "properties": "Properties",
     "renovations": "Renovations",
+    "other_costs": "Other costs",
     "loan_offers": "Loan offers",
     "comps": "Comps",
     "checklist": "Checklist",
@@ -29,6 +31,7 @@ SHEETS = {
 REQUIRED = {
     "properties": ["deal_id", "purchase_price", "arv", "holding_months", "monthly_holding_cost"],
     "renovations": ["deal_id", "item", "cost"],
+    "other_costs": ["deal_id", "item", "cost"],
     "loan_offers": ["deal_id", "offer"],
     "comps": ["deal_id", "floor_area_sqm", "price"],
     "checklist": ["deal_id", "item"],
@@ -46,9 +49,11 @@ SETTING_KINDS = {
 
 # Number columns and the values they allow
 RATES = ["loan_ratio", "annual_interest_rate", "loan_fee_rate",
-         "acquisition_rate", "broker_rate", "cgt_rate"]  # 0% to 100%
+         "acquisition_rate", "broker_rate", "cgt_rate", "contingency_rate",
+         "price_discount_rate", "income_tax_rate", "vat_rate"]  # 0% to 100%
 NOT_NEGATIVE = ["purchase_price", "arv", "holding_months", "monthly_holding_cost",
-                "zonal_value", "fair_market_value", "cost", "price", "lot_area_sqm"]
+                "zonal_value", "fair_market_value", "cost", "price", "lot_area_sqm",
+                "holding_months_worst"]
 ABOVE_ZERO = ["floor_area_sqm"]
 
 
@@ -68,10 +73,13 @@ class Inputs:
     first_rows: dict[str, int] = field(default_factory=dict)
     settings: Settings = field(default_factory=Settings)
     checklist: pd.DataFrame | None = None
+    other_costs: pd.DataFrame | None = None
 
     def tables(self) -> dict[str, pd.DataFrame]:
         tables = {"properties": self.properties, "renovations": self.renovations,
                   "loan_offers": self.loan_offers}
+        if self.other_costs is not None:
+            tables["other_costs"] = self.other_costs
         if self.comps is not None:
             tables["comps"] = self.comps
         if self.checklist is not None:
@@ -119,6 +127,16 @@ def check_inputs(inputs: Inputs) -> None:
                 elif column in ABOVE_ZERO and value == 0:
                     problems.append(f"{where}: {column} must be more than 0")
 
+            if name == "properties" and "tax_mode" in table.columns \
+                    and not pd.isna(row["tax_mode"]) and row["tax_mode"] not in TAX_MODES:
+                problems.append(f"{where}: tax_mode is {row['tax_mode']!r}; use "
+                                f"{' or '.join(TAX_MODES)} (or leave blank for capital_asset)")
+            if name == "properties" and "holding_months_worst" in table.columns:
+                worst, likely = row["holding_months_worst"], row["holding_months"]
+                if pd.api.types.is_number(worst) and pd.api.types.is_number(likely) \
+                        and not pd.isna(worst) and not pd.isna(likely) and worst < likely:
+                    problems.append(f"{where}: holding_months_worst ({worst:g}) is less than "
+                                    f"holding_months ({likely:g})")
             if name == "comps" and "kind" in table.columns and not pd.isna(row["kind"]) \
                     and str(row["kind"]).strip().lower() not in KINDS:
                 problems.append(f"{where}: kind is {row['kind']!r}; use one of "
@@ -152,12 +170,14 @@ def check_inputs(inputs: Inputs) -> None:
 
 
 def load_csv_inputs(properties_path, renovations_path, loan_offers_path,
-                    comps_path=None) -> Inputs:
+                    comps_path=None, other_costs_path=None) -> Inputs:
     """Load and check the CSV tables. Data is SAMPLE if any file has the label."""
     paths = {"properties": properties_path, "renovations": renovations_path,
              "loan_offers": loan_offers_path}
     if comps_path:
         paths["comps"] = comps_path
+    if other_costs_path:
+        paths["other_costs"] = other_costs_path
     notes = {name: file_notes(path) for name, path in paths.items()}
     tables = {name: load_deals(path).dropna(how="all") for name, path in paths.items()}
 
@@ -169,6 +189,7 @@ def load_csv_inputs(properties_path, renovations_path, loan_offers_path,
         sample=any("SAMPLE DATA" in note for lines in notes.values() for note in lines),
         sources=[str(path) for path in paths.values()],
         first_rows={name: len(notes[name]) + 2 for name in paths},  # notes, header, data
+        other_costs=tables.get("other_costs"),
     )
     check_inputs(inputs)
     return inputs
@@ -234,7 +255,7 @@ def read_settings(sheet: pd.DataFrame | None) -> Settings:
 def load_excel_inputs(path) -> Inputs:
     """Load and check the Excel input workbook made by `python -m flip.template`."""
     sheets = pd.read_excel(path, sheet_name=None)
-    optional = ("comps", "checklist")
+    optional = ("comps", "checklist", "other_costs")
     missing = [sheet for name, sheet in SHEETS.items()
                if name not in optional and sheet not in sheets]
     if missing:
@@ -254,6 +275,7 @@ def load_excel_inputs(path) -> Inputs:
         first_rows={name: 2 for name in tables},  # row 1 is the header
         settings=read_settings(sheets.get("Settings")),
         checklist=tables.get("checklist"),
+        other_costs=tables.get("other_costs"),
     )
     check_inputs(inputs)
     return inputs

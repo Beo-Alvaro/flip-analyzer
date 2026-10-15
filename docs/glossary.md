@@ -40,6 +40,15 @@ numbers exactly, and every later feature is checked against it.
 | Holding period | 6 months | How long you own the property, from purchase to sale. |
 | Holding costs | 90,000 | Ongoing costs of owning the property: utilities, association dues, real property tax, security. 15,000/month × 6. |
 
+## Extra costs and risks
+
+| Term | Meaning |
+|---|---|
+| Contingency | Extra money set aside for renovation surprises, as a share of the renovation budget (often about 10%). Counts in total cost and cash invested. |
+| Other costs | Up-front costs that aren't renovation: eviction and legal fees, unpaid association dues or property tax left by the previous owner, title transfer. Counts in total cost and cash invested. |
+| Price discount | A discount on the price for how you pay, e.g. Pag-IBIG's discounts for cash or short-term installment. You pay price × (1 − discount); acquisition costs and the loan are based on that. |
+| Worst-case months | Your own worst-case holding period for a house, e.g. if an eviction is contested. Stress uses it, and Conservative goes halfway to it, instead of the same +4 and +2 months for every house. |
+
 ## Selling
 
 | Term | Anchor deal | Meaning |
@@ -92,6 +101,11 @@ Both ROIs cover the whole holding period. They are not annual rates.
 | 70% rule | A US rule of thumb: maximum purchase price = 70% × ARV − renovation. Anchor deal: 0.70 × 4,200,000 − 450,000 = 2,490,000, so the 2,800,000 price fails it. Used here only as a warning sign, not a decision rule, because PH costs differ from US costs. |
 
 ## Philippine tax note: capital vs. ordinary asset
+
+Each house has a **tax mode**. *capital_asset* (the default) charges the
+6% CGT described below. *business* charges no CGT; instead it charges
+income tax on a positive profit and VAT on the sale, at rates you enter.
+Neither rate is built in: get them from an accountant.
 
 The 6% CGT applies when the property is a **capital asset**, for example
 an individual selling a property occasionally. If the seller is in the

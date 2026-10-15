@@ -16,8 +16,8 @@ transfer tax, and registration; 3% broker commission.
 | Question | Output |
 |---|---|
 | What will this flip earn? | Net profit, ROI on total cost, cash-on-cash ROI |
-| Where does the money go? | Cost waterfall: purchase, acquisition, renovation, interest, loan fees, holding, selling |
-| What if things go wrong? | Base, Conservative, and Stress scenarios |
+| Where does the money go? | Cost waterfall: price paid (after any payment-mode discount), acquisition, renovation, contingency, other costs (eviction, unpaid dues and tax, title), interest, loan fees, holding, selling, and income tax for business sellers |
+| What if things go wrong? | Base, Conservative, and Stress scenarios; Stress uses each house's own worst-case months when given (an occupied foreclosure gets a longer Stress than a vacant house) |
 | What's the most I should pay? | Max offer: highest price that still breaks even (or earns a target profit) under Stress |
 | Which loan is better? | Loan offers side by side, including paying cash |
 | Is my sale price realistic? | Suggested ARV from resale comps (median price per sqm x floor area) with a low–high range; new units shown as a ceiling, foreclosures as a floor, pasalo prices left out; warnings for old, odd, or too few comps |
@@ -208,14 +208,15 @@ docs/
 ## Limitations
 
 - **Comps are asking prices,** usually higher than final sale prices.
-- **6% capital gains tax assumes the property is a capital asset.** If
-  flipping is your business, the BIR may treat it as an ordinary asset,
-  taxed under regular income tax and possibly VAT instead. The rate is an
-  input, so this can be changed per deal.
+- **Business tax mode uses rates you enter.** By default a sale is taxed
+  as a capital asset (6% CGT). A habitual flipper may be taxed as a
+  business instead (income tax and possibly VAT); the tool supports that
+  per house, but the rates are inputs to confirm with an accountant, not
+  built-in rules. Creditable withholding tax is not modeled.
 - **Interest is simple interest on the full loan.** Real bank loans usually
   amortize, and loan prepayment penalties are not modeled.
-- **Holding, renovation, and legal costs are estimates** until replaced
-  with real quotes.
+- **Holding, renovation, contingency, and other costs are estimates**
+  until replaced with real quotes.
 - This is a learning project, not investment advice.
 
 ## Terms

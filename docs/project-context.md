@@ -44,10 +44,17 @@ floor; pasalo left out) with range and warnings, workbook Checklist and
 Settings sheets, `python -m flip.template --upgrade` keeps user data.
 Settings defaults: safe rate 6%, min profit 200,000, min yearly
 cash-on-cash 15%, price must be <= Stress max offer.
-Phase B (next, changes analyze(): needs user approval of formulas):
-contingency, Other costs sheet (eviction, arrears, title), price
-discount by payment mode, best/likely/worst holding months, business
-tax option with user-entered rates.
+Phase B (done, approved by user): analyze() gained contingency_rate,
+other_costs, price_discount_rate, tax_mode (capital_asset | business),
+income_tax_rate, vat_rate; all default off. cash_invested now includes
+contingency and other costs. Other costs sheet (summed per house like
+renovations). holding_months_worst per house: Stress uses it,
+Conservative goes halfway (scenarios.py worst_case_share). Business mode:
+no CGT, selling = broker + VAT x ARV, income tax = rate x max(profit
+before tax, 0), included in total cost but not cash invested. CWT is not
+modeled (creditable, not a cost).
+Applied to the user's deals: Imus legal 90,000 moved to Other costs, 10%
+contingency, worst 24 months; San Pablo 10% contingency, worst 16 months.
 Phase C: local web app (Streamlit, if it installs on Python 3.15).
 Still not modeled: loan prepayment penalty, amortizing loans.
 Reason: the calculation decides which fields the tables need.

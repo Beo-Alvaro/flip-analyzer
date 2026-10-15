@@ -70,10 +70,11 @@ def analyze_deals(deals: pd.DataFrame, safe_rate: float = Settings.safe_rate) ->
     results = []
     for _, row in deals.iterrows():
         inputs = deal_inputs(row)
+        worst = worst_months(row)
         result = analyze(**inputs)
         months = inputs["holding_months"]
-        result["stress_net_profit"] = run_scenarios(inputs)["Stress"]["net_profit"]
-        result["max_offer_stress"] = max_offer(inputs)
+        result["stress_net_profit"] = run_scenarios(inputs, worst)["Stress"]["net_profit"]
+        result["max_offer_stress"] = max_offer(inputs, worst_months=worst)
         result["break_even_arv"] = break_even_arv(inputs)
         result["break_even_price"] = break_even_price(inputs)
         result["yearly_roi_on_total_cost"] = yearly_return(result["roi_on_total_cost"], months)
@@ -82,10 +83,20 @@ def analyze_deals(deals: pd.DataFrame, safe_rate: float = Settings.safe_rate) ->
         result["profit_vs_safe"] = result["net_profit"] - result["safe_earnings"]
         results.append(result)
 
-    # "purchase" and "renovation" repeat the purchase_price and
-    # renovation_cost input columns, so leave them out.
-    results = pd.DataFrame(results, index=deals.index).drop(columns=["purchase", "renovation"])
+    # "renovation" repeats the renovation_cost input column, and other_costs
+    # may already be an input column, so results that repeat an input are
+    # left out. "purchase" is kept: after a discount it differs from
+    # purchase_price.
+    results = pd.DataFrame(results, index=deals.index)
+    results = results.drop(columns=["renovation"]
+                           + [c for c in results.columns if c in deals.columns])
     return pd.concat([deals, results], axis=1)
+
+
+def worst_months(row: pd.Series) -> float | None:
+    """The deal's own worst-case holding months, if the table has them."""
+    value = row.get("holding_months_worst")
+    return None if value is None or pd.isna(value) else float(value)
 
 
 def print_deals(analyzed: pd.DataFrame) -> None:

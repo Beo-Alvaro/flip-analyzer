@@ -48,11 +48,29 @@ SHEET_COLUMNS = {
                               "seller). Leave blank if unknown.", "pesos"),
         ("floor_area_sqm", "Floor area in sqm. Used with your comps to suggest an ARV.", "sqm"),
         ("source_url", "Optional. Link to the listing.", "text"),
+        ("contingency_rate", "Extra share of renovation set aside for surprises, e.g. 10%. "
+                             "Counts in total cost and cash invested. Blank = 0.", "rate"),
+        ("holding_months_worst", "Optional. Worst-case months to sell, e.g. if eviction or "
+                                 "title transfer drags on. Stress uses it instead of +4 "
+                                 "months.", "months"),
+        ("tax_mode", "capital_asset (blank = this: 6% CGT on the sale) or business "
+                     "(habitual flipper: no CGT; income tax on profit and VAT at the rates "
+                     "you enter). Confirm with an accountant.", "tax"),
+        ("income_tax_rate", "Business mode only: tax rate on profit, e.g. 25%. Get it from "
+                            "your accountant.", "rate"),
+        ("vat_rate", "Business mode only: VAT as a share of the sale price, e.g. 12%, if VAT "
+                     "applies. Get it from your accountant.", "rate"),
     ],
     "Renovations": [
         ("deal_id", SAME_ID, "text"),
         ("item", "What will be done, e.g. Roof repair, Kitchen.", "text"),
         ("cost", "Estimated cost in pesos. Use contractor quotes when you have them.", "pesos"),
+    ],
+    "Other costs": [
+        ("deal_id", SAME_ID, "text"),
+        ("item", "Up-front costs that aren't renovation, e.g. Eviction and legal, Unpaid "
+                 "association dues, Unpaid property tax, Title transfer.", "text"),
+        ("cost", "Amount in pesos. Counts in total cost and cash invested.", "pesos"),
     ],
     "Loan offers": [
         ("deal_id", SAME_ID, "text"),
@@ -64,6 +82,9 @@ SHEET_COLUMNS = {
         ("annual_interest_rate", "Yearly interest rate, e.g. 9%. Type the % sign.", "rate"),
         ("loan_fee_rate", "One-time loan fee as a share of the loan, e.g. 1%. Type the "
                           "% sign.", "rate"),
+        ("price_discount_rate", "Optional. Discount on the price for this payment mode, "
+                                "e.g. a Pag-IBIG cash discount. Confirm it applies to "
+                                "your sale type.", "rate"),
     ],
     "Comps": [
         ("deal_id", "The house this comp is compared to. " + SAME_ID, "text"),
@@ -117,10 +138,12 @@ SETTINGS = [
 ]
 
 FORMATS = {"pesos": "#,##0", "rate": "0.0%", "months": "0", "sqm": "General",
-           "date": "yyyy-mm-dd", "text": "General", "kind": "General", "status": "General"}
+           "date": "yyyy-mm-dd", "text": "General", "kind": "General", "status": "General",
+           "tax": "General"}
 
 # Columns that only accept a value from a list
-LISTS = {"kind": '"resale,new,foreclosed,pasalo"', "status": '"open,done,issue"'}
+LISTS = {"kind": '"resale,new,foreclosed,pasalo"', "status": '"open,done,issue"',
+         "tax": '"capital_asset,business"'}
 
 # What Excel accepts in each kind of column: (type, operator, limit(s), message)
 CHECKS = {
@@ -160,12 +183,13 @@ EXAMPLES = {
          "Renovated", None, "resale", None],
     ],
     "Checklist": [["SAMPLE-01", item, "open", None] for item in STANDARD_CHECKLIST],
+    "Other costs": [],
 }
 
 STEPS = [
     "1. Replace the SAMPLE-01 example rows on every sheet with your own houses.",
     "   Give each house a deal_id and use the same deal_id on every sheet.",
-    "2. Properties: one row per house. Renovations: one row per item.",
+    "2. Properties: one row per house. Renovations and Other costs: one row per item.",
     "   Loan offers: one row per offer. Comps: one row per comparable house; set its kind.",
     "   Checklist: copy the 8 items for each house and update their status as you check.",
     "3. Settings: your criteria for a deal worth doing (the report says if each deal meets them).",

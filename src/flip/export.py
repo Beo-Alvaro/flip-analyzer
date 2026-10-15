@@ -16,7 +16,7 @@ from pathlib import Path
 import pandas as pd
 from openpyxl.styles import Alignment, Font, PatternFill
 
-from flip.batch import analyze_deals, deal_inputs
+from flip.batch import analyze_deals, deal_inputs, worst_months
 from flip.comps import suggested_arv
 from flip.decision import add_verdicts, sensitivity
 from flip.inputs import SAMPLE_BANNER, InputError, Inputs, load_csv_inputs, load_excel_inputs
@@ -96,6 +96,17 @@ COLUMNS = {
     "note": ("Note", None),
     "setting": ("Setting", None),
     "value": ("Value", None),
+    "purchase": ("Price paid", PESOS),
+    "price_discount": ("Price discount", PESOS),
+    "contingency": ("Contingency", PESOS),
+    "other_costs": ("Other costs", PESOS),
+    "income_tax": ("Income tax", PESOS),
+    "contingency_rate": ("Contingency rate", RATE),
+    "holding_months_worst": ("Worst-case months", MONTHS),
+    "tax_mode": ("Tax mode", None),
+    "income_tax_rate": ("Income tax rate", RATE),
+    "vat_rate": ("VAT rate", RATE),
+    "price_discount_rate": ("Price discount rate", RATE),
 }
 
 
@@ -104,8 +115,9 @@ def scenario_table(deals: pd.DataFrame) -> pd.DataFrame:
     rows = []
     for _, deal in deals.iterrows():
         inputs = deal_inputs(deal)
-        for name, result in run_scenarios(inputs).items():
-            adjusted = apply_scenario(inputs, SCENARIOS[name])
+        worst = worst_months(deal)
+        for name, result in run_scenarios(inputs, worst).items():
+            adjusted = apply_scenario(inputs, SCENARIOS[name], worst)
             rows.append({
                 "deal_id": deal["deal_id"],
                 "offer": deal["offer"],
@@ -132,8 +144,9 @@ def about_table(paths: list[str], has_comps: bool = False) -> pd.DataFrame:
          "Calculated in Python by flip.analyzer.analyze(), which is checked against "
          "hand-calculated tests. Editing cells here does not recalculate anything: "
          "change the CSV files and export again."),
-        ("Net profit", "ARV minus total cost (purchase, acquisition, renovation, "
-                       "interest, loan fees, holding, selling)."),
+        ("Net profit", "ARV minus total cost (price paid, acquisition, renovation, "
+                       "contingency, other costs, interest, loan fees, holding, "
+                       "selling, and income tax in business mode)."),
         ("ROI on total cost", "Net profit / total cost. Answers: is this a good deal?"),
         ("Cash-on-cash ROI", "Net profit / cash invested (your own money; selling costs "
                              "come out of the sale). Answers: is this a good use of my money?"),
@@ -145,9 +158,13 @@ def about_table(paths: list[str], has_comps: bool = False) -> pd.DataFrame:
          f"broker {d['broker_rate']:.0%} of selling price, capital gains tax "
          f"{d['cgt_rate']:.0%} on the highest of selling price, zonal value, or fair "
          "market value."),
-        ("Tax note", "Assumes the 6% CGT applies (property sold as a capital asset). "
-                     "A habitual flipper may be taxed as an ordinary asset instead; "
-                     "see docs/glossary.md."),
+        ("Tax note", "Default: the 6% CGT applies (property sold as a capital asset). "
+                     "Deals set to business mode pay no CGT; instead income tax on "
+                     "profit and VAT on the sale, at rates you enter (confirm them "
+                     "with an accountant). See docs/glossary.md."),
+        ("Worst-case months", "When a house has its own worst-case months, Stress "
+                              "uses them and Conservative goes halfway, instead of "
+                              "+4 and +2 months."),
     ]
     rows += [
         ("Yearly ROI", "Each ROI x 12 / holding months, so flips of different lengths "
@@ -177,7 +194,8 @@ def about_table(paths: list[str], has_comps: bool = False) -> pd.DataFrame:
 
 def build_sheets(inputs: Inputs) -> dict[str, pd.DataFrame]:
     """All sheets of the workbook, in order: {sheet name: table}."""
-    deals = build_deals(inputs.properties, inputs.renovations, inputs.loan_offers)
+    deals = build_deals(inputs.properties, inputs.renovations, inputs.loan_offers,
+                        inputs.other_costs)
     analyzed = analyze_deals(deals, inputs.settings.safe_rate)
     analyzed = add_verdicts(analyzed, inputs.settings, inputs.checklist)
     has_comps = inputs.comps is not None and not inputs.comps.empty
@@ -196,8 +214,9 @@ def build_sheets(inputs: Inputs) -> dict[str, pd.DataFrame]:
                        summary["deal_id"].map(checks.set_index("deal_id")["suggested_arv"]))
 
     waterfall = analyzed[[
-        "deal_id", "offer", "purchase_price", "acquisition", "renovation_cost",
-        "interest", "loan_fees", "holding", "selling", "total_cost", "arv", "net_profit",
+        "deal_id", "offer", "purchase_price", "price_discount", "purchase", "acquisition",
+        "renovation_cost", "contingency", "other_costs", "interest", "loan_fees", "holding",
+        "selling", "income_tax", "total_cost", "arv", "net_profit",
     ]]
 
     sheets = {
@@ -212,6 +231,8 @@ def build_sheets(inputs: Inputs) -> dict[str, pd.DataFrame]:
         sheets["ARV check"] = checks
     sheets["Properties"] = inputs.properties
     sheets["Renovations"] = inputs.renovations
+    if inputs.other_costs is not None:
+        sheets["Other costs"] = inputs.other_costs
     sheets["Loan offers"] = inputs.loan_offers
     if has_comps:
         comps = inputs.comps.copy()
@@ -304,6 +325,7 @@ if __name__ == "__main__":
     parser.add_argument("--renovations", default="data/sample_renovations.csv")
     parser.add_argument("--loan-offers", default="data/sample_loan_offers.csv")
     parser.add_argument("--comps", help="optional comps CSV")
+    parser.add_argument("--other-costs", help="optional other costs CSV")
     parser.add_argument("--output-dir", default="output")
     args = parser.parse_args()
 
@@ -312,7 +334,7 @@ if __name__ == "__main__":
             inputs = load_excel_inputs(args.input)
         else:
             inputs = load_csv_inputs(args.properties, args.renovations, args.loan_offers,
-                                     args.comps)
+                                     args.comps, args.other_costs)
         path = export_inputs(inputs, args.output_dir)
     except InputError as error:
         sys.exit(str(error))

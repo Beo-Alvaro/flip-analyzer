@@ -41,8 +41,8 @@ def edit(path, changes):
 def test_template_sheets_and_data_type(template):
     wb = load_workbook(template)
 
-    assert wb.sheetnames == ["Instructions", "Properties", "Renovations", "Loan offers", "Comps",
-                             "Checklist", "Settings"]
+    assert wb.sheetnames == ["Instructions", "Properties", "Renovations", "Other costs",
+                             "Loan offers", "Comps", "Checklist", "Settings"]
     assert wb["Instructions"][DATA_TYPE_CELL].value == "SAMPLE"
 
 

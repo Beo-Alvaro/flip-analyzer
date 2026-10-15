@@ -10,28 +10,45 @@ from flip.analyzer import analyze
 #   arv_change:        -0.05 = sells for 5% less than the expected ARV
 #   renovation_change:  0.10 = renovation runs 10% over budget
 #   extra_months:          2 = holding period runs 2 months longer
+#   worst_case_share:    0.5 = when a deal has its own worst-case months,
+#                              go this share of the way from its likely
+#                              months to its worst case (replaces extra_months)
 SCENARIOS = {
-    "Base": {"arv_change": 0.00, "renovation_change": 0.00, "extra_months": 0},
-    "Conservative": {"arv_change": -0.05, "renovation_change": 0.10, "extra_months": 2},
-    "Stress": {"arv_change": -0.10, "renovation_change": 0.25, "extra_months": 4},
+    "Base": {"arv_change": 0.00, "renovation_change": 0.00, "extra_months": 0,
+             "worst_case_share": 0.0},
+    "Conservative": {"arv_change": -0.05, "renovation_change": 0.10, "extra_months": 2,
+                     "worst_case_share": 0.5},
+    "Stress": {"arv_change": -0.10, "renovation_change": 0.25, "extra_months": 4,
+               "worst_case_share": 1.0},
 }
 
 
-def apply_scenario(deal: dict, scenario: dict) -> dict:
-    """Return a copy of the deal's inputs with the scenario's changes applied."""
+def apply_scenario(deal: dict, scenario: dict, worst_months: float | None = None) -> dict:
+    """Return a copy of the deal's inputs with the scenario's changes applied.
+
+    worst_months: the deal's own worst-case holding period, if known. An
+    occupied foreclosure can then get a much longer Stress than a vacant
+    house, instead of the same +4 months for every deal.
+    """
     adjusted = dict(deal)
     adjusted["arv"] = deal["arv"] * (1 + scenario["arv_change"])
     adjusted["renovation_cost"] = deal["renovation_cost"] * (1 + scenario["renovation_change"])
-    adjusted["holding_months"] = deal["holding_months"] + scenario["extra_months"]
+    months = deal["holding_months"]
+    if worst_months is None or worst_months != worst_months:  # None or NaN
+        adjusted["holding_months"] = months + scenario["extra_months"]
+    else:
+        adjusted["holding_months"] = months + scenario["worst_case_share"] * (worst_months - months)
     return adjusted
 
 
-def run_scenarios(deal: dict) -> dict:
+def run_scenarios(deal: dict, worst_months: float | None = None) -> dict:
     """Analyze the deal under every scenario: {scenario name: analyze() result}."""
-    return {name: analyze(**apply_scenario(deal, s)) for name, s in SCENARIOS.items()}
+    return {name: analyze(**apply_scenario(deal, s, worst_months))
+            for name, s in SCENARIOS.items()}
 
 
-def max_offer(deal: dict, scenario: str = "Stress", min_profit: float = 0) -> float | None:
+def max_offer(deal: dict, scenario: str = "Stress", min_profit: float = 0,
+              worst_months: float | None = None) -> float | None:
     """Highest purchase price that still earns min_profit under the scenario.
 
     By default: the most you can pay and still break even if the Stress
@@ -41,7 +58,7 @@ def max_offer(deal: dict, scenario: str = "Stress", min_profit: float = 0) -> fl
 
     Returns None if no price works, not even 0.
     """
-    adjusted = apply_scenario(deal, SCENARIOS[scenario])
+    adjusted = apply_scenario(deal, SCENARIOS[scenario], worst_months)
 
     def profit_at(price):
         return analyze(**{**adjusted, "purchase_price": price})["net_profit"]

@@ -42,21 +42,33 @@ def check_deal_ids(properties: pd.DataFrame, table: pd.DataFrame, table_name: st
 
 
 def build_deals(properties: pd.DataFrame, renovations: pd.DataFrame,
-                loan_offers: pd.DataFrame) -> pd.DataFrame:
-    """Combine the three tables into one row per house and loan offer."""
+                loan_offers: pd.DataFrame,
+                other_costs: pd.DataFrame | None = None) -> pd.DataFrame:
+    """Combine the tables into one row per house and loan offer.
+
+    other_costs (optional): items like eviction and legal costs, unpaid dues
+    and property tax, or title transfer, added up per house like renovations.
+    """
     repeated = sorted(set(properties["deal_id"][properties["deal_id"].duplicated()]))
     if repeated:
         raise ValueError(f"properties lists a deal_id more than once: {', '.join(repeated)}")
     check_deal_ids(properties, renovations, "renovations")
     check_deal_ids(properties, loan_offers, "loan_offers")
 
-    # 1. Add up each house's renovation items. A house with no items gets 0.
-    totals = (
-        renovations.groupby("deal_id")["cost"].sum()
-        .reset_index().rename(columns={"cost": "renovation_cost"})
-    )
-    deals = properties.merge(totals, on="deal_id", how="left")
-    deals["renovation_cost"] = deals["renovation_cost"].fillna(0)
+    # 1. Add up each house's renovation items (and other cost items).
+    #    A house with no items gets 0.
+    deals = properties
+    item_tables = [(renovations, "renovation_cost")]
+    if other_costs is not None:
+        check_deal_ids(properties, other_costs, "other_costs")
+        item_tables.append((other_costs, "other_costs"))
+    for items, column in item_tables:
+        totals = (
+            items.groupby("deal_id")["cost"].sum()
+            .reset_index().rename(columns={"cost": column})
+        )
+        deals = deals.merge(totals, on="deal_id", how="left")
+        deals[column] = deals[column].fillna(0)
 
     # 2. Pair each house with each of its loan offers: 3 offers = 3 rows.
     #    how="left" keeps houses with no offers; they get analyze()'s default
@@ -72,9 +84,10 @@ def build_deals(properties: pd.DataFrame, renovations: pd.DataFrame,
 def print_report(properties: pd.DataFrame, renovations: pd.DataFrame,
                  analyzed: pd.DataFrame, suggestions: pd.DataFrame | None = None,
                  settings: Settings | None = None,
-                 checklist: pd.DataFrame | None = None) -> None:
-    """Print each house's report: ARV check, renovation budget, loan offers
-    side by side, verdict, what matters most, and checklist.
+                 checklist: pd.DataFrame | None = None,
+                 other_costs: pd.DataFrame | None = None) -> None:
+    """Print each house's report: ARV check, renovation budget, other costs,
+    loan offers side by side, verdict, what matters most, and checklist.
 
     suggestions (from comps.suggested_arv) adds the ARV check against comps.
     """
@@ -83,18 +96,28 @@ def print_report(properties: pd.DataFrame, renovations: pd.DataFrame,
         deal_id = house["deal_id"]
         print(f"{deal_id}  {house.get('description', '')}")
 
+        worst = house.get("holding_months_worst")
+        months = f"  Holding: {house['holding_months']:g} months"
+        if worst is not None and not pd.isna(worst):
+            months += f" likely, {worst:g} worst case (used by Stress)"
+        print(months)
+        if house.get("tax_mode") == "business":
+            print(f"  Tax: business (income tax {house.get('income_tax_rate', 0) or 0:.0%} "
+                  f"on profit, VAT {house.get('vat_rate', 0) or 0:.0%} of the sale; no CGT)")
+
         if suggestions is not None:
             print_arv_check(house, suggestions[suggestions["deal_id"] == deal_id].iloc[0])
 
-        print("  Renovation budget")
         items = renovations[renovations["deal_id"] == deal_id]
-        if items.empty:
-            print("    (no items)")
-        item_width = max([30] + [len(str(name)) + 2 for name in items["item"]])
-        for _, item in items.iterrows():
-            print(f"    {item['item']:<{item_width}}{item['cost']:>12,.0f}")
-        print(f"    {'Total':<{item_width}}{items['cost'].sum():>12,.0f}")
-        print()
+        extra = []
+        rate = house.get("contingency_rate")
+        if rate is not None and not pd.isna(rate) and rate > 0:
+            extra.append((f"Contingency ({rate:.0%})", items["cost"].sum() * rate))
+        print_items("Renovation budget", items, extra)
+        if other_costs is not None:
+            mine = other_costs[other_costs["deal_id"] == deal_id]
+            if not mine.empty:
+                print_items("Other costs", mine)
 
         offers = analyzed[analyzed["deal_id"] == deal_id]
         width = max([15] + [len(str(name)) + 2 for name in offers["offer"]])
@@ -120,6 +143,10 @@ def print_report(properties: pd.DataFrame, renovations: pd.DataFrame,
         print(f"  {'Loan offers':<26}" + "".join(f"{o['offer']:>{width}}" for o in rows))
         row("Loan", [loan(o) for o in rows])
         row("Loan fee", [fee(o) for o in rows])
+        if any(o["price_discount"] > 0 for o in rows):
+            row("Price paid (after discount)", [pesos(o["purchase"]) for o in rows])
+        if any(o["income_tax"] > 0 for o in rows):
+            row("Income tax", [pesos(o["income_tax"]) for o in rows])
         row("Net profit", [pesos(o["net_profit"]) for o in rows])
         row("Cash invested", [pesos(o["cash_invested"]) for o in rows])
         row("ROI on total cost", [percent(o["roi_on_total_cost"]) for o in rows])
@@ -162,6 +189,23 @@ def print_report(properties: pd.DataFrame, renovations: pd.DataFrame,
             print()
 
 
+def print_items(title: str, items: pd.DataFrame, extra: list | None = None) -> None:
+    """A titled list of items with costs and a total; extra = [(label, amount)]."""
+    extra = extra or []
+    print(f"  {title}")
+    if items.empty:
+        print("    (no items)")
+    labels = [str(name) for name in items["item"]] + [label for label, _ in extra]
+    width = max([30] + [len(label) + 2 for label in labels])
+    for _, item in items.iterrows():
+        print(f"    {item['item']:<{width}}{item['cost']:>12,.0f}")
+    for label, amount in extra:
+        print(f"    {label:<{width}}{amount:>12,.0f}")
+    total = items["cost"].sum() + sum(amount for _, amount in extra)
+    print(f"    {'Total':<{width}}{total:>12,.0f}")
+    print()
+
+
 def print_arv_check(house: pd.Series, s: pd.Series) -> None:
     """Your ARV next to what the comps suggest, plus any warnings."""
     if pd.isna(s["suggested_arv"]):
@@ -197,6 +241,7 @@ if __name__ == "__main__":
     parser.add_argument("--renovations", default="data/sample_renovations.csv")
     parser.add_argument("--loan-offers", default="data/sample_loan_offers.csv")
     parser.add_argument("--comps", help="optional comps CSV")
+    parser.add_argument("--other-costs", help="optional other costs CSV")
     args = parser.parse_args()
 
     try:
@@ -204,7 +249,7 @@ if __name__ == "__main__":
             inputs = load_excel_inputs(args.input)
         else:
             inputs = load_csv_inputs(args.properties, args.renovations, args.loan_offers,
-                                     args.comps)
+                                     args.comps, args.other_costs)
     except InputError as error:
         sys.exit(str(error))
 
@@ -212,9 +257,10 @@ if __name__ == "__main__":
         print(SAMPLE_BANNER)
         print()
     analyzed = analyze_deals(build_deals(inputs.properties, inputs.renovations,
-                                         inputs.loan_offers), inputs.settings.safe_rate)
+                                         inputs.loan_offers, inputs.other_costs),
+                             inputs.settings.safe_rate)
     analyzed = add_verdicts(analyzed, inputs.settings, inputs.checklist)
     has_comps = inputs.comps is not None and not inputs.comps.empty
     suggestions = suggested_arv(inputs.properties, inputs.comps) if has_comps else None
     print_report(inputs.properties, inputs.renovations, analyzed, suggestions,
-                 inputs.settings, inputs.checklist)
+                 inputs.settings, inputs.checklist, inputs.other_costs)
