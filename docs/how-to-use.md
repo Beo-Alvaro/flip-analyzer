@@ -96,7 +96,7 @@ new-unit ceiling then becomes the key number.
 - **Foreclosures** show the as-is price before repairs. The analyzer uses
   them only as a floor.
 
-![A comp listing](images/how-to-use/02-comp.png)
+![A foreclosed comp: the same 41.94 sqm model in the same subdivision, minimum bid ₱1,955,700](images/how-to-use/02-comp-foreclosed.png)
 
 > **Quick screen: stop here if the numbers can't work.**
 > Compare the price with what a **brand-new unit** of similar size costs
