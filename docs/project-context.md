@@ -63,6 +63,21 @@ palette validated for colorblind safety and contrast on Streamlit's light
 and dark backgrounds; every chart has a "See the numbers" table. Tested
 headless with Streamlit AppTest (tests/test_app.py).
 Still not modeled: loan prepayment penalty, amortizing loans.
+
+## Market scan (flip.market)
+data/market/cavite_listings.csv: ~340 public listings collected
+2026-10-16 (FazWaz city pages for new/resale; ForeclosurePhilippines
+page 1 and acquiredassets.info for Pag-IBIG; other pages and Lamudi/Dot
+Property/OnePropertee block automated reading). Facts and links only.
+Rules: repeats removed (same link, or same city/kind/price/floor area);
+unknown kind, pasalo, no floor area, floor < 25 sqm, or price per sqm
+outside 10,000-150,000 left out of medians. Benchmark = resale median if
+>= 3 resale, else new median if >= 3 new (a ceiling), else none.
+Candidates = foreclosures <= 70% of their city's benchmark.
+Finding: online Cavite listings are mostly developer units (8 confirmed
+resales of ~300); Tanza and Trece Martires foreclosures sit at 74-81% of
+new-unit prices (little room); Imus, Dasmarinas, Bacoor look cheaper vs
+new units but much less so vs their few resales (70-79%).
 Reason: the calculation decides which fields the tables need.
 
 ## Cost waterfall

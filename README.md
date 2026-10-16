@@ -26,6 +26,16 @@ transfer tax, and registration; 3% broker commission.
 | Is it worth it vs. doing nothing? | Yearly ROI, and profit compared with a safe account at your rate |
 | Does it meet my rules? | A verdict against your own criteria (minimum profit, minimum yearly return, max offer) and a due-diligence checklist per house |
 
+## How to use
+
+1. Find a listing and 3 to 5 comparable homes nearby.
+2. Create the input workbook (`python -m flip.template`) and fill it in.
+3. Start the web app (`python -m flip.web`) and pick your house.
+4. Read the verdict, key numbers, and charts; try what-ifs.
+5. Download the Excel report.
+
+**Full walkthrough with screenshots: [docs/how-to-use.md](docs/how-to-use.md)**
+
 ## Example: the anchor deal
 
 Every calculation is tested against one hand-calculated deal: a
@@ -150,6 +160,20 @@ the checklist. A **What-if** panel tries different numbers on screen
 without touching your workbook, and the sidebar downloads the Excel
 report. Stop it with Ctrl+C.
 
+### Market scan: where are foreclosures cheap?
+
+```bash
+python -m flip.market data/market/cavite_listings.csv --output output/cavite_market.xlsx
+```
+
+Reads a CSV of listings (city, kind, price, floor area...) and writes a
+workbook with the median price per sqm of **new**, **resale**, and
+**foreclosed** homes per city, each city's foreclosure-to-benchmark
+ratio, and a **Candidates** sheet of foreclosures priced at or below 70%
+of their city's benchmark. `data/market/cavite_listings.csv` is a sample
+of about 300 public Cavite listings collected in October 2026; add rows
+you find yourself and run it again.
+
 ### Other commands
 
 | Command | What it does |
@@ -175,6 +199,7 @@ src/flip/
   tables.py      properties + renovation items + loan offers -> one row per offer
   decision.py    break-even, what matters most, yearly ROI, safe account, verdict
   comps.py       suggested ARV from comparable sales, by kind, with warnings
+  market.py      price per sqm by city and kind; foreclosure candidates
   inputs.py      load CSV or Excel input, check it for typing mistakes
   template.py    create the Excel input workbook
   export.py      write the formatted Excel report
