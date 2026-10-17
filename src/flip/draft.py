@@ -24,25 +24,15 @@ import sys
 import pandas as pd
 from openpyxl import load_workbook
 
-from flip.market import clean, load_listings
+from flip.market import AREA_TOLERANCE, clean, load_listings, type_group
 from flip.pagibig import PROPERTY_NUMBER
 
-AREA_TOLERANCE = 0.25
 LIMITS = {"resale": 5, "new": 2, "foreclosed": 2}
-TYPE_GROUPS = {
-    "townhouse": "row", "rowhouse": "row", "row house": "row",
-    "single attached": "attached", "duplex": "attached", "double attached": "attached",
-    "quadruplex": "attached", "single detached": "detached",
-}
 TIERS = {1: "same subdivision", 2: "same barangay", 3: "same city"}
 
 
 def _text(value) -> str:
     return "" if value is None or pd.isna(value) else str(value).strip().lower()
-
-
-def _group(value) -> str:
-    return TYPE_GROUPS.get(_text(value), _text(value))
 
 
 def pick_comps(listings: pd.DataFrame, house: dict) -> pd.DataFrame:
@@ -68,9 +58,9 @@ def pick_comps(listings: pd.DataFrame, house: dict) -> pd.DataFrame:
     else:
         pool["area_gap"] = 0.0
 
-    group = _group(house.get("type"))
+    group = type_group(house.get("type"))
     if group:
-        pool = pool[pool["type"].map(_group).isin(["", group])]
+        pool = pool[pool["type"].map(type_group).isin(["", group])]
 
     subdivision, barangay = _text(house.get("subdivision")), _text(house.get("barangay"))
 

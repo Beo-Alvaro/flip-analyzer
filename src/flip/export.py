@@ -125,6 +125,8 @@ COLUMNS = {
     "foreclosed_median_per_sqm": ("Foreclosed median per sqm", PESOS),
     "benchmark": ("Benchmark", None),
     "benchmark_per_sqm": ("Benchmark per sqm", PESOS),
+    "benchmark_listings": ("Benchmark listings", None),
+    "foreclosures_in_subdivision": ("Foreclosures for sale in subdivision", None),
     "foreclosed_vs_benchmark": ("Foreclosed vs benchmark", "0%"),
     "foreclosed_vs_resale": ("Foreclosed vs resale", "0%"),
     "vs_benchmark": ("vs benchmark", "0%"),

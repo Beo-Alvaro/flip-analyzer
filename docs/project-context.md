@@ -100,8 +100,20 @@ auction, 171 2nd auction, 599 negotiated sale). Supply is concentrated
 have < 3 resales, so the benchmark falls back to the new-unit median from
 pricier subdivisions, and the screen flags 469 "candidates". Same-
 subdivision checks (where they exist) show foreclosures at 72-109% of
-other listings. Proposed next: screen only against like-for-like comps and
-show Pag-IBIG supply per subdivision (not built yet).
+other listings.
+Fix (user-approved): each foreclosure is compared like for like:
+same-subdivision resale, then same-subdivision new (>= 2 listings,
+floor area within 25%, same type group, rules shared with flip.draft),
+then city resale (>= 3), then city new, which can only rule out (a
+ceiling from pricier subdivisions proves nothing when far below it).
+Subdivision names match after dropping case, phase numbers, "The",
+"Subdivision", the city's name, plurals; a 2+ word name matches its
+sections. Distinct Pag-IBIG property numbers are never merged as repeats
+(25 Westdale units share one price). Foreclosures sheet + supply column.
+Result 2026-10-17: 0 candidates; 572 little room (incl. all 9 with a
+same-subdivision comparison, 85-115% of new); 598 no fair comparison
+(133 of them unoccupied): the next step there is hand-collected resale
+prices per subdivision.
 Reason: the calculation decides which fields the tables need.
 
 ## Cost waterfall

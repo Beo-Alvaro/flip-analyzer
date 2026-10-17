@@ -166,13 +166,20 @@ report. Stop it with Ctrl+C.
 python -m flip.market data/market/cavite_listings.csv --output output/cavite_market.xlsx
 ```
 
-Reads a CSV of listings (city, kind, price, floor area...) and writes a
-workbook with the median price per sqm of **new**, **resale**, and
-**foreclosed** homes per city, each city's foreclosure-to-benchmark
-ratio, and a **Candidates** sheet of foreclosures priced at or below 70%
-of their city's benchmark. `data/market/cavite_listings.csv` is a sample
-of about 300 public Cavite listings collected in October 2026; add rows
-you find yourself and run it again.
+Reads a CSV of listings (city, kind, price, floor area, subdivision...)
+and writes a workbook with the median price per sqm of **new**,
+**resale**, and **foreclosed** homes per city, and a **Foreclosures**
+sheet that compares each foreclosure like for like: with resale, then
+new, listings of a similar size and type in the **same subdivision**,
+then with the city's resale median. New units elsewhere in the city can
+only rule a house out (they are often in pricier subdivisions). Each
+row also shows how many foreclosures are for sale in its subdivision:
+your competition when you resell. Those at or below 70% of a fair
+comparison go to the **Candidates** sheet; "no fair comparison" means
+collect resale prices from that subdivision first.
+`data/market/cavite_listings.csv` holds about 1,500 public Cavite listings
+collected in October 2026 (FazWaz plus every Pag-IBIG house); add rows you
+find yourself and run it again.
 
 ### Keep it current: import Pag-IBIG's listings
 

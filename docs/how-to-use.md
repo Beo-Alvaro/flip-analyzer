@@ -24,10 +24,21 @@ and Excel to fill in the input workbook.
 ![Searching foreclosed properties by province](images/how-to-use/01-search.png)
 
 **Start with the market scan.** `output/cavite_market.xlsx` (built with
-`python -m flip.market`) shows, city by city, how foreclosure prices per
-sqm compare with new and resale homes, and lists foreclosures already
-priced at or below 70% of their city's benchmark. Shortlist from its
-**Candidates** sheet, preferring unoccupied units.
+`python -m flip.market`) compares every foreclosure with similar houses
+(same subdivision, size, and type first) and runs the Step 2 quick screen
+for you. On its **Foreclosures** sheet:
+
+- **worth a closer look**: at or below 70% of a fair comparison. These are
+  also on the **Candidates** sheet.
+- **little room**: near what similar houses cost, even new ones. Skip.
+- **no fair comparison**: cheaper than new units elsewhere in the city,
+  but nothing similar to compare with. Collect a few resale prices from
+  its subdivision (Step 2), add them to the listings CSV as `resale`, and
+  rebuild. One subdivision's prices cover all its foreclosures.
+
+Prefer unoccupied units, and check **Foreclosures for sale in subdivision**:
+when dozens of the same house are for sale from Pag-IBIG, you will resell
+against them.
 
 To keep it current, collect Pag-IBIG's listings once a month with the
 browser snippet in `docs/pagibig-opa-collector.js` (instructions at its
