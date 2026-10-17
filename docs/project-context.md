@@ -114,6 +114,14 @@ Result 2026-10-17: 0 candidates; 572 little room (incl. all 9 with a
 same-subdivision comparison, 85-115% of new); 598 no fair comparison
 (133 of them unoccupied): the next step there is hand-collected resale
 prices per subdivision.
+Resale search 2026-10-17 (Lumina Tanza, Palmerston, Jade Residences,
+Pagsikat Place): no confirmed owner resale on readable sites; only
+developer prices and pasalo posts (resales are on Facebook/Lamudi/
+OnePropertee, which block automated reading). Added 4 developer prices
+(new) and 6 Lumina FazWaz feed listings (unknown: seller type not stated).
+By hand: Pagsikat minimum bids 1.27-1.30M exceed the developer's 1.2M new
+44 sqm unit (skip); Jade 42.5 sqm 2nd-auction bid 1,184,220 = 64% of the
+developer's RFO price per sqm (only lead; needs resale prices).
 Reason: the calculation decides which fields the tables need.
 
 ## Cost waterfall
