@@ -29,6 +29,14 @@ sqm compare with new and resale homes, and lists foreclosures already
 priced at or below 70% of their city's benchmark. Shortlist from its
 **Candidates** sheet, preferring unoccupied units.
 
+To keep it current, download Pag-IBIG's latest auction list (PDF) from
+pagibigfund.gov.ph each month and import it:
+
+```bash
+python -m flip.pagibig data/market/LIST.pdf --into data/market/cavite_listings.csv
+python -m flip.market data/market/cavite_listings.csv --output output/cavite_market.xlsx
+```
+
 **What makes a good candidate:** a price well below what *renovated* homes
 nearby sell for; vacant rather than occupied; a clean or consolidated title.
 
@@ -68,6 +76,12 @@ after renovation. Good comps are:
 
 For each comp, write down: subdivision, link, type, **floor area**, lot
 area, price, condition, and date listed.
+
+**Start with drafts.** Add the house to the Properties sheet (Step 4) with
+its `city`, `barangay`, `subdivision`, and `type`, then run
+`python -m flip.draft YOUR-DEAL-ID`. The most similar listings from the
+market data land on the Comps sheet marked DRAFT. Check each one, delete
+the poor matches, and add the comps you find yourself.
 
 **Where to find resale homes**
 - Listing sites (FazWaz, Lamudi, Dot Property, OnePropertee, Carousell).

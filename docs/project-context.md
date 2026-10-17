@@ -74,6 +74,16 @@ unknown kind, pasalo, no floor area, floor < 25 sqm, or price per sqm
 outside 10,000-150,000 left out of medians. Benchmark = resale median if
 >= 3 resale, else new median if >= 3 new (a ceiling), else none.
 Candidates = foreclosures <= 70% of their city's benchmark.
+Automation (user-approved options 1 and 2): flip.pagibig imports
+Pag-IBIG's official tranche PDFs (pdfplumber; 11 columns: item, property
+number, location "Subdivision - Blk/Lot - Brgy. X, City, Province", type,
+TCT, lot area, floor area, minimum bid, appraisal date, GMI, remarks);
+links stored as "pagibig:<property number>"; replaces rows for the same
+property number. pagibigfund.gov.ph blocks automated reading, so the user
+downloads the PDF; tested on SPB 321 (Apr 2024): 195 Cavite houses.
+flip.draft drafts comps into the Comps sheet from the market data using
+new Properties columns city/barangay/subdivision/type. Scraping sites that
+block automated reading was ruled out.
 Finding: online Cavite listings are mostly developer units (8 confirmed
 resales of ~300); Tanza and Trece Martires foreclosures sit at 74-81% of
 new-unit prices (little room); Imus, Dasmarinas, Bacoor look cheaper vs

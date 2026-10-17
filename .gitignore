@@ -11,6 +11,9 @@ __pycache__/
 # Your real deals: kept out of git so they stay private if the repo is public
 data/deals_input.xlsx
 
+# Downloaded Pag-IBIG auction lists (re-downloadable; the imported rows are kept)
+data/market/*.pdf
+
 # Generated reports (Excel export lands here)
 output/
 ~$*.xlsx

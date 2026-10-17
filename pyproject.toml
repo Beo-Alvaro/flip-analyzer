@@ -7,7 +7,7 @@ name = "flip-analyzer"
 version = "0.1.0"
 description = "House flip deal analyzer: expected profit and ROI for Philippine properties (PHP)"
 requires-python = ">=3.11"
-dependencies = ["pandas>=3.0", "openpyxl>=3.1"]
+dependencies = ["pandas>=3.0", "openpyxl>=3.1", "pdfplumber>=0.11"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "streamlit>=1.50"]

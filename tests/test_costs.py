@@ -181,8 +181,9 @@ def test_template_has_phase_b_columns(template):
     properties = [c.value for c in wb["Properties"][1]]
     offers = [c.value for c in wb["Loan offers"][1]]
 
-    assert properties[-5:] == ["contingency_rate", "holding_months_worst", "tax_mode",
-                               "income_tax_rate", "vat_rate"]
+    # Columns K-O (11-15), after the original ten
+    assert properties[10:15] == ["contingency_rate", "holding_months_worst", "tax_mode",
+                                 "income_tax_rate", "vat_rate"]
     assert offers[-1] == "price_discount_rate"
     assert [c.value for c in wb["Other costs"][1]][:3] == ["deal_id", "item", "cost"]
 

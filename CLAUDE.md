@@ -44,3 +44,7 @@ start of a new session.
   sample_loan_offers.csv: SAMPLE data, must stay labeled as sample
   (split tables; used by src/flip/tables.py)
 - Sample label = a "# SAMPLE DATA: ..." first line; tests enforce it
+- data/market/cavite_listings.csv: real public listings (facts and links
+  only) for the market scan; Pag-IBIG rows imported from official PDFs
+  have links like "pagibig:<property number>". Downloaded PDFs are
+  gitignored

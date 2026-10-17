@@ -174,6 +174,32 @@ of their city's benchmark. `data/market/cavite_listings.csv` is a sample
 of about 300 public Cavite listings collected in October 2026; add rows
 you find yourself and run it again.
 
+### Keep it current: import Pag-IBIG's auction lists
+
+Pag-IBIG publishes each auction batch as a PDF on
+[pagibigfund.gov.ph](https://www.pagibigfund.gov.ph) (Properties for sale;
+Cavite is in the NCR branch tranches). Download the current one, then:
+
+```bash
+python -m flip.pagibig data/market/LIST.pdf --into data/market/cavite_listings.csv
+```
+
+Every Cavite house in it is added with its minimum bid, floor and lot area,
+and occupancy (lots and condos are skipped; a property already in the file
+is replaced by the official row). Rebuild the market report afterwards.
+
+### Draft comps for a house
+
+```bash
+python -m flip.draft TANZA-01
+```
+
+Fill in the house's `city` (and `barangay`, `subdivision`, `type` if known)
+on the Properties sheet first. The most similar listings from the market
+data (same subdivision, then barangay, then city; floor area within 25%;
+same type) are added to the Comps sheet marked DRAFT: up to 5 resale, 2
+new, and 2 foreclosed. Check each one before relying on it.
+
 ### Other commands
 
 | Command | What it does |
@@ -200,6 +226,8 @@ src/flip/
   decision.py    break-even, what matters most, yearly ROI, safe account, verdict
   comps.py       suggested ARV from comparable sales, by kind, with warnings
   market.py      price per sqm by city and kind; foreclosure candidates
+  pagibig.py     import Pag-IBIG's official auction lists (PDF)
+  draft.py       draft comps for a house from the market data
   inputs.py      load CSV or Excel input, check it for typing mistakes
   template.py    create the Excel input workbook
   export.py      write the formatted Excel report

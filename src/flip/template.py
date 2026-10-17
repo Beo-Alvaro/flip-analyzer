@@ -60,6 +60,14 @@ SHEET_COLUMNS = {
                             "your accountant.", "rate"),
         ("vat_rate", "Business mode only: VAT as a share of the sale price, e.g. 12%, if VAT "
                      "applies. Get it from your accountant.", "rate"),
+        ("city", "Optional. City or town, e.g. Tanza. Needed to draft comps from the market "
+                 "scan (python -m flip.draft).", "text"),
+        ("barangay", "Optional. Barangay, e.g. Bucal. Comps in the same barangay rank higher.",
+         "text"),
+        ("subdivision", "Optional. Subdivision name. Comps in the same subdivision rank "
+                        "highest.", "text"),
+        ("type", "Optional. townhouse, rowhouse, single attached, duplex, or single detached. "
+                 "Comps of a different type are left out.", "text"),
     ],
     "Renovations": [
         ("deal_id", SAME_ID, "text"),
