@@ -174,19 +174,28 @@ of their city's benchmark. `data/market/cavite_listings.csv` is a sample
 of about 300 public Cavite listings collected in October 2026; add rows
 you find yourself and run it again.
 
-### Keep it current: import Pag-IBIG's auction lists
+### Keep it current: import Pag-IBIG's listings
 
-Pag-IBIG publishes each auction batch as a PDF on
-[pagibigfund.gov.ph](https://www.pagibigfund.gov.ph) (Properties for sale;
-Cavite is in the NCR branch tranches). Download the current one, then:
+Pag-IBIG now lists foreclosures only on its
+[Online Public Auction](https://www.pagibigfundservices.com/OnlinePublicAuction/)
+site (it stopped publishing PDF lists). Once a month:
+
+1. Open the site, choose the region and province (e.g. REGION 4-A, CAVITE).
+2. Press F12, open the Console tab, paste
+   [docs/pagibig-opa-collector.js](docs/pagibig-opa-collector.js), and press
+   Enter. It reads every city's 1st auction, 2nd auction, and negotiated sale
+   listings (about 10 minutes for Cavite, pausing between pages) and
+   downloads `opa_listings.json`. It only reads; it never bids or logs in.
+3. Move the file to `data/market/` and import it:
 
 ```bash
-python -m flip.pagibig data/market/LIST.pdf --into data/market/cavite_listings.csv
+python -m flip.pagibig data/market/opa_listings.json
 ```
 
-Every Cavite house in it is added with its minimum bid, floor and lot area,
-and occupancy (lots and condos are skipped; a property already in the file
-is replaced by the official row). Rebuild the market report afterwards.
+Every house is added with its price, floor and lot area, occupancy, and sale
+type; lots, condos, and parking slots are skipped, and a property already in
+the file is replaced by the new row. Older PDF lists can be imported the same
+way (`python -m flip.pagibig LIST.pdf`). Rebuild the market report afterwards.
 
 ### Draft comps for a house
 

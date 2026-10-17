@@ -46,5 +46,6 @@ start of a new session.
 - Sample label = a "# SAMPLE DATA: ..." first line; tests enforce it
 - data/market/cavite_listings.csv: real public listings (facts and links
   only) for the market scan; Pag-IBIG rows imported from official PDFs
-  have links like "pagibig:<property number>". Downloaded PDFs are
+  have links like "pagibig:<property number>" (from the Online Public
+  Auction collector JSON or older PDFs). Downloaded PDFs and JSON are
   gitignored

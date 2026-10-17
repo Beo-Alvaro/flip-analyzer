@@ -29,11 +29,12 @@ sqm compare with new and resale homes, and lists foreclosures already
 priced at or below 70% of their city's benchmark. Shortlist from its
 **Candidates** sheet, preferring unoccupied units.
 
-To keep it current, download Pag-IBIG's latest auction list (PDF) from
-pagibigfund.gov.ph each month and import it:
+To keep it current, collect Pag-IBIG's listings once a month with the
+browser snippet in `docs/pagibig-opa-collector.js` (instructions at its
+top), then import and rebuild:
 
 ```bash
-python -m flip.pagibig data/market/LIST.pdf --into data/market/cavite_listings.csv
+python -m flip.pagibig data/market/opa_listings.json
 python -m flip.market data/market/cavite_listings.csv --output output/cavite_market.xlsx
 ```
 

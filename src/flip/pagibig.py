@@ -1,15 +1,24 @@
-"""Import Pag-IBIG's official auction lists (PDF) into the market scan data.
+"""Import Pag-IBIG's official listings into the market scan data.
 
-Pag-IBIG publishes each auction batch ("tranche") as a PDF on
-www.pagibigfund.gov.ph under Properties for sale; Cavite is in the NCR
-branch tranches. Download the current one in your browser, then run:
+Two formats:
 
-    python -m flip.pagibig LIST.pdf --into data/market/cavite_listings.csv
+1. The Online Public Auction site (current). Pag-IBIG now lists properties
+   only at https://www.pagibigfundservices.com/OnlinePublicAuction/. The
+   browser snippet in docs/pagibig-opa-collector.js reads every listing for
+   a province (all three tabs: 1st auction, 2nd auction, negotiated sale)
+   and saves them as a JSON file. Then:
 
-Every house in the chosen province (default Cavite) is added as a
-foreclosed listing with its minimum bid, floor and lot area, and whether
-it is occupied. Lots and condominiums are skipped. A property already in
-the file (same Pag-IBIG property number) is replaced by the official row.
+       python -m flip.pagibig data/market/opa_cavite.json
+
+2. Auction list PDFs (older; Pag-IBIG published these until about 2024):
+
+       python -m flip.pagibig LIST.pdf
+
+Every house in the province (default Cavite) is added to
+data/market/cavite_listings.csv as a foreclosed listing with its price,
+floor and lot area, and whether it is occupied. Lots, condos, and parking
+slots are skipped. A property already in the file (same Pag-IBIG property
+number) is replaced by the new row.
 """
 
 import argparse
@@ -32,6 +41,7 @@ TYPES = {  # as written in the list -> as used in the market data
 }
 CITY_NAMES = {"Dasmariñas": "Dasmarinas", "Gen. Mariano Alvarez": "GMA",
               "General Mariano Alvarez": "GMA"}
+ROMAN = re.compile(r"\b(?:I{2,3}|IV|VI{0,3}|IX|X)\b", re.IGNORECASE)
 
 
 def _last_number(cell) -> float | None:
@@ -106,6 +116,75 @@ def parse_row(cells: list) -> dict | None:
     }
 
 
+OPA_SALES = {"1st auction": "minimum bid (1st auction)",
+             "2nd auction": "minimum bid (2nd auction)",
+             "negotiated sale": "selling price (negotiated sale)"}
+
+
+def _opa_type(text: str) -> str | None:
+    """OPA property type -> market type, or None for lots, condos, parking."""
+    t = text.upper()
+    if any(skip in t for skip in ("LOT ONLY", "CONDOMINIUM", "PARKING")):
+        return None
+    for start, name in [("TOWN", "townhouse"), ("ROW", "rowhouse"), ("DUPLEX", "duplex"),
+                        ("DOUBLE ATTACHED", "double attached"),
+                        ("SINGLE ATTACHED", "single attached"),
+                        ("SINGLE DETACHED", "single detached"), ("QUADRUPLEX", "quadruplex")]:
+        if t.startswith(start):
+            return name
+    return text.lower()
+
+
+def parse_opa_card(card: dict) -> dict | None:
+    """One Online Public Auction card (as saved by the collector snippet) ->
+    one listing, or None if it isn't a house."""
+    house_type = _opa_type(card.get("type", ""))
+    if house_type is None or not PROPERTY_NUMBER.search(card.get("id", "")):
+        return None
+    # "CITY OF DASMARIÑAS" -> "Dasmariñas" -> "Dasmarinas"; "GEN. MARIANO ALVAREZ" -> "GMA"
+    city = re.sub(r"^CITY OF ", "", card.get("city", "").strip().upper()).title()
+    city = CITY_NAMES.get(city, city)
+    occupancy = card.get("occupancy", "").lower()
+    start = re.match(r"([A-Z][a-z]{2})\.? (\d{1,2}), (\d{4})", card.get("dates", ""))
+    listed = ""
+    if start:
+        try:
+            listed = pd.Timestamp(f"{start.group(1)} {start.group(2)}, {start.group(3)}").date().isoformat()
+        except ValueError:
+            pass
+    sale = card.get("sale", "")
+    return {
+        "city": city,
+        "barangay": "",
+        # "BELVEDERE TOWNE II" -> "Belvedere Towne II" (title() alone gives "Ii")
+        "subdivision": ROMAN.sub(lambda m: m.group(0).upper(), card.get("name", "").strip().title()),
+        "type": house_type,
+        "kind": "foreclosed",
+        "kind_reason": "Pag-IBIG",
+        "price": _last_number(card.get("price")),
+        "price_basis": OPA_SALES.get(sale, "minimum bid"),
+        "floor_area_sqm": _last_number(card.get("floor")),
+        "lot_area_sqm": _last_number(card.get("lot")),
+        "occupancy": "unoccupied" if occupancy.startswith("unoccupied") else
+                     "occupied" if occupancy.startswith("occupied") else "",
+        "date_listed": listed,
+        "notes": f"{sale}; batch {card.get('batch', '')}; offers {card.get('dates', '')}".strip(),
+        "link": f"pagibig:{card['id']}",
+        "source": "pagibigfundservices.com Online Public Auction",
+        "collected": date.today().isoformat(),
+    }
+
+
+def import_opa(path) -> pd.DataFrame:
+    """Read a JSON file saved by docs/pagibig-opa-collector.js."""
+    import json
+
+    cards = json.loads(Path(path).read_text(encoding="utf-8"))
+    if isinstance(cards, dict):
+        cards = cards.get("rows", [])
+    return pd.DataFrame([p for p in (parse_opa_card(c) for c in cards) if p])
+
+
 def read_tables(path) -> tuple[list[list], str]:
     """All table rows in the PDF, plus page 1's text (for the tranche and date)."""
     import pdfplumber
@@ -170,20 +249,24 @@ def merge_into(listings_path, imported: pd.DataFrame) -> tuple[int, int]:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Import a Pag-IBIG auction list (PDF).")
-    parser.add_argument("pdf", help="the auction list downloaded from pagibigfund.gov.ph")
-    parser.add_argument("--province", default="Cavite")
+    parser = argparse.ArgumentParser(description="Import Pag-IBIG listings (OPA JSON or PDF).")
+    parser.add_argument("file", help="JSON saved by docs/pagibig-opa-collector.js, or an "
+                                     "auction list PDF")
+    parser.add_argument("--province", default="Cavite", help="for PDFs (default: Cavite)")
     parser.add_argument("--into", default="data/market/cavite_listings.csv",
                         help="listings CSV to add to (default: data/market/cavite_listings.csv)")
     args = parser.parse_args()
 
-    rows, first_text = read_tables(args.pdf)
-    tranche, listed = list_details(first_text)
-    imported = import_rows(rows, args.province, tranche, listed)
+    if args.file.lower().endswith(".json"):
+        imported, label = import_opa(args.file), "Online Public Auction"
+    else:
+        rows, first_text = read_tables(args.file)
+        tranche, listed = list_details(first_text)
+        imported = import_rows(rows, args.province, tranche, listed)
+        label = f"{tranche or 'List'} ({listed or 'date not found'})"
     if imported.empty:
-        sys.exit(f"No {args.province} houses found in {args.pdf}. Is it a Pag-IBIG auction list?")
+        sys.exit(f"No houses found in {args.file}. Is it a Pag-IBIG listing file?")
     added, replaced = merge_into(args.into, imported)
     occupied = int((imported["occupancy"] == "occupied").sum())
-    print(f"{tranche or 'List'} ({listed or 'date not found'}): {len(imported)} {args.province} "
-          f"houses ({occupied} occupied, {len(imported) - occupied} not). "
-          f"{added} new, {replaced} replaced in {args.into}")
+    print(f"{label}: {len(imported)} houses ({occupied} occupied, "
+          f"{len(imported) - occupied} not). {added} new, {replaced} replaced in {args.into}")

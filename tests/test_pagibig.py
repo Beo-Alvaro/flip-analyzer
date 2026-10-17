@@ -7,7 +7,8 @@ import pandas as pd
 import pytest
 
 from flip.batch import file_notes, load_deals
-from flip.pagibig import import_rows, list_details, merge_into, parse_row
+from flip.pagibig import (import_opa, import_rows, list_details, merge_into,
+                          parse_opa_card, parse_row)
 
 HEADER = ["ITEM\nNO", "PROPERTY NUMBER", "", "TYPE", "TCT/CCT NO.", "LOT\nAREA", "FLOOR\nAREA",
           "MINIMUM BID\nPRICE", "APPRAISAL\nDATE", "REQUIRED GROSS\nMONTHLY INCOME", "REMARKS"]
@@ -116,3 +117,70 @@ def test_merge_replaces_the_same_property(tmp_path):
     assert len(merged) == 3
     elisa = merged[merged["link"] == "pagibig:815202307130071"].iloc[0]
     assert elisa["price"] == 4_235_400  # the official minimum bid replaced the old row
+
+
+# --- Online Public Auction cards (as saved by docs/pagibig-opa-collector.js) ---
+# Real cards collected from pagibigfundservices.com, October 2026.
+
+BELVEDERE = {"id": "815202508290182", "name": "BELVEDERE TOWNE I", "type": "Row House",
+             "dates": "Oct. 12, 2026 12:00 AM - Oct. 16, 2026 11:59 PM", "batch": "OPA1510115",
+             "occupancy": "Unoccupied", "lot": "38.5 sqm", "floor": "35 sqm",
+             "price": "₱497,350", "sale": "1st auction", "city": "TANZA"}
+ELISA_OPA = {"id": "815202608280010", "name": "ELISA HOMES", "type": "Town House",
+             "dates": "Oct. 12, 2026 12:00 AM - Oct. 16, 2026 11:59 PM", "batch": "OPA1510115",
+             "occupancy": "Occupied", "lot": "54 sqm", "floor": "80 sqm",
+             "price": "₱1,824,000", "sale": "2nd auction", "city": "CITY OF BACOOR"}
+HYACINTH = {"id": "815202605260160", "name": "TANZA GARDEN ENCLAVE (HYACINTH)",
+            "type": "Single Attached", "dates": "Oct. 10, 2026 12:00 AM - Oct. 16, 2026 11:59 PM",
+            "batch": "15328", "occupancy": "Unoccupied", "lot": "73.75 sqm",
+            "floor": "122.5 sqm", "price": "₱5,722,650", "sale": "negotiated sale",
+            "city": "TANZA"}
+OPA_LOT = {**BELVEDERE, "id": "815202600000001", "type": "Lot Only",
+           "occupancy": "Unoccupied-Lot", "floor": "0 sqm"}
+
+
+def test_opa_card():
+    r = parse_opa_card(BELVEDERE)
+
+    assert (r["city"], r["subdivision"], r["type"]) == ("Tanza", "Belvedere Towne I", "rowhouse")
+    assert (r["price"], r["floor_area_sqm"], r["lot_area_sqm"]) == (497_350, 35, 38.5)
+    assert (r["occupancy"], r["date_listed"]) == ("unoccupied", "2026-10-12")
+    assert r["price_basis"] == "minimum bid (1st auction)"
+    assert r["link"] == "pagibig:815202508290182"
+
+
+def test_opa_city_names_and_sale_types():
+    elisa = parse_opa_card(ELISA_OPA)
+    assert (elisa["city"], elisa["type"], elisa["occupancy"]) == ("Bacoor", "townhouse", "occupied")
+    assert elisa["price_basis"] == "minimum bid (2nd auction)"
+    hyacinth = parse_opa_card(HYACINTH)
+    assert hyacinth["price_basis"] == "selling price (negotiated sale)"
+    assert hyacinth["price"] == 5_722_650
+    for written, expected in [("CITY OF DASMARIÑAS", "Dasmarinas"),
+                              ("GEN. MARIANO ALVAREZ", "GMA"),
+                              ("CITY OF TRECE MARTIRES", "Trece Martires")]:
+        assert parse_opa_card({**BELVEDERE, "city": written})["city"] == expected
+
+
+@pytest.mark.parametrize("written, expected", [
+    ("BELVEDERE TOWNE II", "Belvedere Towne II"),
+    ("CHRISTINE VILLAGE IV", "Christine Village IV"),
+    ("GOLDENVILLE SUBDIVISION II", "Goldenville Subdivision II"),
+    ("VILLA LUISA HOMES III", "Villa Luisa Homes III"),
+    ("PARAGON VILLAGE PHASE I", "Paragon Village Phase I"),  # single I left as "I"
+    ("IVORY CREST VILLAGE", "Ivory Crest Village"),          # "Iv..." inside a word untouched
+])
+def test_opa_subdivision_names_keep_roman_numerals(written, expected):
+    assert parse_opa_card({**BELVEDERE, "name": written})["subdivision"] == expected
+
+
+def test_opa_lots_are_skipped():
+    assert parse_opa_card(OPA_LOT) is None
+
+
+def test_import_opa_file(tmp_path):
+    import json
+    path = tmp_path / "opa.json"
+    path.write_text(json.dumps([BELVEDERE, ELISA_OPA, OPA_LOT]), encoding="utf-8")
+
+    assert list(import_opa(path)["link"]) == ["pagibig:815202508290182", "pagibig:815202608280010"]

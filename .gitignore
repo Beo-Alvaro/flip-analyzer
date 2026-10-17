@@ -13,6 +13,7 @@ data/deals_input.xlsx
 
 # Downloaded Pag-IBIG auction lists (re-downloadable; the imported rows are kept)
 data/market/*.pdf
+data/market/*.json
 
 # Generated reports (Excel export lands here)
 output/

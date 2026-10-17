@@ -79,8 +79,14 @@ Pag-IBIG's official tranche PDFs (pdfplumber; 11 columns: item, property
 number, location "Subdivision - Blk/Lot - Brgy. X, City, Province", type,
 TCT, lot area, floor area, minimum bid, appraisal date, GMI, remarks);
 links stored as "pagibig:<property number>"; replaces rows for the same
-property number. pagibigfund.gov.ph blocks automated reading, so the user
-downloads the PDF; tested on SPB 321 (Apr 2024): 195 Cavite houses.
+property number. Tested on SPB 321 (Apr 2024): 195 Cavite houses.
+Pag-IBIG has since STOPPED publishing PDFs; listings are only on the
+Online Public Auction site (pagibigfundservices.com/OnlinePublicAuction),
+searchable one city at a time, 10 cards per page, three tabs (1st auction,
+2nd auction, negotiated sale), no export. docs/pagibig-opa-collector.js is
+a console snippet the user runs there (reads only, paced); flip.pagibig
+imports its JSON. Its occupancy/floor filters don't apply via script, so it
+collects everything and the import skips lots/condos.
 flip.draft drafts comps into the Comps sheet from the market data using
 new Properties columns city/barangay/subdivision/type. Scraping sites that
 block automated reading was ruled out.
@@ -88,6 +94,14 @@ Finding: online Cavite listings are mostly developer units (8 confirmed
 resales of ~300); Tanza and Trece Martires foreclosures sit at 74-81% of
 new-unit prices (little room); Imus, Dasmarinas, Bacoor look cheaper vs
 new units but much less so vs their few resales (70-79%).
+OPA import 2026-10-17: 1,159 Cavite houses (375 unoccupied; 389 1st
+auction, 171 2nd auction, 599 negotiated sale). Supply is concentrated
+(Tanza 532, Naic 360; Westdale Villas alone 137). Flaw found: most cities
+have < 3 resales, so the benchmark falls back to the new-unit median from
+pricier subdivisions, and the screen flags 469 "candidates". Same-
+subdivision checks (where they exist) show foreclosures at 72-109% of
+other listings. Proposed next: screen only against like-for-like comps and
+show Pag-IBIG supply per subdivision (not built yet).
 Reason: the calculation decides which fields the tables need.
 
 ## Cost waterfall
