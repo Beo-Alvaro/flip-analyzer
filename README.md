@@ -31,8 +31,9 @@ transfer tax, and registration; 3% broker commission.
 1. Start the web app (`python -m flip.web`). On **Market scan**, pick a
    foreclosure and press **Start a deal** (or find a listing yourself).
 2. Find 3 to 5 comparable resale homes in its subdivision.
-3. Fill in the rest in the input workbook (`python -m flip.template`
-   creates it): renovation items, loan offers, comps.
+3. On **Edit a house**, add the comps, renovation items, and loan offers,
+   and update the ARV (or do it in the Excel input workbook;
+   `python -m flip.template` creates it).
 4. On **Analyze a house**, read the verdict, key numbers, and charts; try
    what-ifs.
 5. Download the Excel report.
@@ -155,14 +156,18 @@ pip install -e ".[web]"
 python -m flip.web
 ```
 
-It opens in your browser at http://localhost:8501 with two pages, in the
-order of the deal cycle:
+It opens in your browser at http://localhost:8501 with three pages, in
+the order of the deal cycle:
 
 - **Market scan**: import Pag-IBIG's listings (the collector snippet and
   steps are on the page), filter every screened foreclosure (city, screen
   result, unoccupied, offer window still open, how many are for sale in
   the subdivision), and **Start a deal**: the house's price, floor area,
   and location go into your workbook along with the standard checklist.
+- **Edit a house**: its numbers (price, ARV, months, holding cost...) and
+  tables for renovation items, other costs, loan offers, comps, and the
+  checklist, with the suggested ARV updating as you type comps. One
+  **Save changes** button saves only what you changed; **Discard** undoes.
 - **Analyze a house**: pick a house and a loan offer to see the verdict,
   the key numbers, charts of the scenarios, what matters most, and where
   the money goes, the ARV check, costs, and the checklist. A **What-if**
@@ -262,9 +267,10 @@ src/flip/
   inputs.py      load CSV or Excel input, check it for typing mistakes
   template.py    create the Excel input workbook
   workbook.py    save into the workbook safely: checked, backed up
+  editing.py     the Edit page's conversions (rates as %, dates as text)
   export.py      write the formatted Excel report
-  app.py         the web app (Streamlit): views/market.py, views/analyze.py;
-                 ui.py has shared pieces; web.py starts it
+  app.py         the web app (Streamlit): views/market.py, views/edit.py,
+                 views/analyze.py; ui.py has shared pieces; web.py starts it
   charts.py      web app charts, colorblind-safe in light and dark mode
 tests/           hand-calculated tests for every module
 data/            SAMPLE data (made up, labeled as such)

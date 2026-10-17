@@ -7,8 +7,9 @@ import pytest
 from openpyxl import load_workbook
 
 from flip.inputs import InputError, load_excel_inputs
+from flip.tables import build_deals
 from flip.template import STANDARD_CHECKLIST, create_template
-from flip.workbook import WorkbookBusy, add_deal, backup, next_deal_id
+from flip.workbook import WorkbookBusy, add_deal, backup, next_deal_id, save_house
 
 HOUSE = {"deal_id": "TANZA-01", "description": "Test house", "purchase_price": 1_000_000,
          "arv": 1_500_000, "holding_months": 6, "monthly_holding_cost": 5_000,
@@ -91,3 +92,56 @@ def test_backup_names(tmp_path):
     assert first.name == "listings-20261017-143005.csv"
     assert second.name == "listings-20261017-143005-2.csv"  # same second, not overwritten
     assert first.read_text(encoding="utf-8") == "city\n"
+
+
+def renovation_cells(path):
+    ws = load_workbook(path)["Renovations"]
+    return [tuple(c.value for c in row[:3]) for row in ws.iter_rows(min_row=2)
+            if any(c.value is not None for c in row[:3])]
+
+
+def test_save_house_replaces_only_that_houses_rows(workbook):
+    add_deal(workbook, HOUSE)
+    # TANZA-01's renovation, typed after SAMPLE-01's six items
+    save_house(workbook, "TANZA-01", tables={"Renovations": [
+        {"deal_id": "TANZA-01", "item": "Paint", "cost": 40_000}]})
+
+    save_house(workbook, "SAMPLE-01", tables={"Renovations": [
+        {"deal_id": "SAMPLE-01", "item": "Kitchen", "cost": 150_000},
+        {"deal_id": "SAMPLE-01", "item": "Paint and finishes", "cost": 50_000}]})
+
+    # SAMPLE-01's 6 rows became 2, in the same place; TANZA-01's row moved up, unchanged
+    assert renovation_cells(workbook) == [("SAMPLE-01", "Kitchen", 150_000),
+                                          ("SAMPLE-01", "Paint and finishes", 50_000),
+                                          ("TANZA-01", "Paint", 40_000)]
+    deals = build_deals(*[getattr(load_excel_inputs(workbook), t) for t in
+                          ("properties", "renovations", "loan_offers", "other_costs")])
+    assert deals.groupby("deal_id")["renovation_cost"].first().to_dict() == {
+        "SAMPLE-01": 200_000, "TANZA-01": 40_000}  # 150,000 + 50,000
+
+
+def test_save_house_updates_and_clears_cells(workbook):
+    save_house(workbook, "SAMPLE-01", house={"arv": 4_300_000, "floor_area_sqm": None})
+
+    house = load_excel_inputs(workbook).properties.set_index("deal_id").loc["SAMPLE-01"]
+    assert house["arv"] == 4_300_000
+    assert pd.isna(house["floor_area_sqm"])  # cleared
+    assert house["purchase_price"] == 2_800_000  # untouched
+
+
+def test_other_houses_formulas_are_refused_not_lost(workbook):
+    add_deal(workbook, HOUSE)
+    wb = load_workbook(workbook)
+    wb["Renovations"]["A8"], wb["Renovations"]["B8"] = "TANZA-01", "Roof"
+    wb["Renovations"]["C8"] = "=30000+10000"
+    wb.save(workbook)
+    before = workbook.read_bytes()
+
+    with pytest.raises(InputError, match="C8 holds a formula"):
+        save_house(workbook, "SAMPLE-01", house={"arv": 4_300_000})
+    assert workbook.read_bytes() == before
+
+
+def test_save_house_needs_a_known_house(workbook):
+    with pytest.raises(InputError, match="NOPE-01 is not on the Properties sheet"):
+        save_house(workbook, "NOPE-01", house={"arv": 1})

@@ -177,6 +177,13 @@ every column, and hovering over a column header shows a note too. Delete
 the `SAMPLE-01` example rows when you enter real houses, and set **Data
 type** to `REAL`.
 
+**Or fill it in from the web app.** Steps 4 to 7 can also be done on the
+app's **Edit a house** page (start it as in Step 8): one tab per sheet,
+the suggested ARV updating as you type comps, and one **Save changes**
+button. The app saves into this same workbook, checked and backed up
+first, so you can switch between Excel and the app; close the workbook in
+Excel before saving in the app.
+
 ![The input workbook](images/how-to-use/03-workbook.png)
 
 ---

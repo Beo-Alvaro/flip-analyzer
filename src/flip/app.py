@@ -1,9 +1,11 @@
 """Flip Deal Analyzer: the web app. Start it with `python -m flip.web`.
 
-Two pages, in the order of the deal cycle:
+Three pages, in the order of the deal cycle:
 
     Market scan     refresh Pag-IBIG listings, screen every foreclosure,
                     and start a deal from one (views/market.py)
+    Edit a house    its details, renovation items, other costs, loan
+                    offers, comps, and checklist (views/edit.py)
     Analyze a house the verdict, both ROIs, scenarios, and the max offer for
                     each house in your workbook (views/analyze.py)
 
@@ -20,6 +22,7 @@ st.set_page_config(page_title="Flip Deal Analyzer", page_icon=":material/home:",
 
 page = st.navigation([
     st.Page("views/market.py", title="Market scan", icon=":material/travel_explore:"),
+    st.Page("views/edit.py", title="Edit a house", icon=":material/edit:"),
     st.Page("views/analyze.py", title="Analyze a house", icon=":material/calculate:"),
 ])
 

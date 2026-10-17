@@ -73,9 +73,18 @@ never saved). Every save goes through flip.workbook: refused while Excel's
 original backed up to a backups/ folder next to it (gitignored), then
 replaced. Offer windows: notes carry the collector's full date text;
 offer_closes is blank for rows imported with only a start date.
-Next phases: 2 = edit comps, renovations, other costs, loan offers,
-checklist in the app; 3 = paste helper (resale/new/pasalo hints, pasalo
-full price and balance check) and comps fed back into the market data.
+Phase 2 done: views/edit.py (Edit a house): House tab (Properties
+fields) + data editors for Renovations, Other costs, Loan offers, Comps
+(live suggested ARV), Checklist (standard items prefilled when empty).
+flip.editing converts rates to % and dates to text and back, so untouched
+tables round-trip unchanged (verified on the real workbook: one edited
+cell = one changed cell). One Save writes only changed fields and tables
+via workbook.save_house; a house's rows are replaced in place and other
+houses' cells are kept as they were. Formulas in the tables block saving
+(openpyxl can't recalculate them). The House picker follows you across
+pages (session key current_deal).
+Next: phase 3 = paste helper (resale/new/pasalo hints, pasalo full price
+and balance check) and comps fed back into the market data.
 
 ## Market scan (flip.market)
 data/market/cavite_listings.csv: ~340 public listings collected

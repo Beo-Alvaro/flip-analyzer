@@ -20,7 +20,7 @@ from flip.export import export_inputs
 from flip.inputs import SAMPLE_BANNER, InputError, load_excel_inputs
 from flip.scenarios import run_scenarios
 from flip.tables import build_deals
-from flip.ui import load_inputs, pct, peso, uploaded_workbook, workbook_path
+from flip.ui import load_inputs, pct, peso, pick_house, uploaded_workbook, workbook_path
 
 # --- Where the deals come from (chosen in the sidebar) ---
 
@@ -60,9 +60,10 @@ if inputs.sample:
 # --- Pick a house, try what-ifs ---
 
 houses = inputs.properties
-descriptions = dict(zip(houses["deal_id"], houses.get("description", houses["deal_id"])))
-deal_id = st.selectbox("House", list(houses["deal_id"]),
-                       format_func=lambda d: f"{d}  ·  {descriptions.get(d, '')}", key="house")
+deal_id = pick_house(houses, key="house")
+if temp is None:
+    st.page_link("views/edit.py", label="Edit this house: costs, loans, comps, checklist",
+                 icon=":material/edit:")
 house = houses[houses["deal_id"] == deal_id].iloc[0]
 
 

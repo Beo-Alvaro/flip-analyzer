@@ -243,7 +243,8 @@ if submitted:
         st.error("Not saved. The workbook would have these problems:")
         st.code(str(error), language=None)
     else:
+        st.session_state["current_deal"] = row["deal_id"]  # the other pages start on it
         st.success(f"Added **{row['deal_id']}** to `{path}`. The previous version is backed "
-                   f"up at `{saved}`. Next: add its renovation items and comps in the "
-                   "workbook, then analyze it.", icon=":material/check_circle:")
-        st.page_link("views/analyze.py", label="Analyze it", icon=":material/calculate:")
+                   f"up at `{saved}`. Next: add its comps, renovation items, and loan "
+                   "offers, then analyze it.", icon=":material/check_circle:")
+        st.page_link("views/edit.py", label="Fill in the rest", icon=":material/edit:")
