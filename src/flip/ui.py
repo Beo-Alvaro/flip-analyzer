@@ -1,0 +1,45 @@
+"""Pieces shared by the web app's pages (src/flip/views)."""
+
+import tempfile
+from pathlib import Path
+
+import pandas as pd
+import streamlit as st
+
+from flip.inputs import load_excel_inputs
+
+DEFAULT_WORKBOOK = "data/deals_input.xlsx"
+DEFAULT_LISTINGS = "data/market/cavite_listings.csv"
+
+
+def peso(value) -> str:
+    """Pesos with the sign first: -₱309,300."""
+    if value is None or pd.isna(value):
+        return "none"
+    return f"-₱{-value:,.0f}" if round(value) < 0 else f"₱{abs(value):,.0f}"
+
+
+def pct(value) -> str:
+    return "-" if value is None or pd.isna(value) else f"{value:.2%}"
+
+
+@st.cache_data(show_spinner=False)
+def load_inputs(path: str, modified: float):
+    """Load the workbook; cached until the file changes (its modified time)."""
+    return load_excel_inputs(path)
+
+
+def workbook_path() -> Path:
+    """The workbook named in the sidebar."""
+    return Path(st.session_state.get("path") or DEFAULT_WORKBOOK)
+
+
+def uploaded_workbook() -> Path | None:
+    """The workbook uploaded in the sidebar, saved to a temporary file, if any.
+    An uploaded workbook is only read: saving goes to the path in the sidebar."""
+    uploaded = st.session_state.get("upload")
+    if uploaded is None:
+        return None
+    temp = Path(tempfile.gettempdir()) / "flip_uploaded_input.xlsx"
+    temp.write_bytes(uploaded.getvalue())
+    return temp

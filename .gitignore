@@ -10,6 +10,8 @@ __pycache__/
 
 # Your real deals: kept out of git so they stay private if the repo is public
 data/deals_input.xlsx
+# Backups the web app makes before every save (they hold your real deals too)
+backups/
 
 # Downloaded Pag-IBIG auction lists (re-downloadable; the imported rows are kept)
 data/market/*.pdf

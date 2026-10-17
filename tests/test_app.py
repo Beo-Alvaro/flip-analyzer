@@ -10,13 +10,14 @@ from streamlit.testing.v1 import AppTest
 from flip.template import create_template
 
 APP = str(Path(__file__).parent.parent / "src" / "flip" / "app.py")
+ANALYZE = "views/analyze.py"
 
 
 @pytest.fixture
 def app(tmp_path):
     workbook = create_template(tmp_path / "deals_input.xlsx")
     at = AppTest.from_file(APP, default_timeout=60)
-    at.run()
+    at.switch_page(ANALYZE).run()
     at.sidebar.text_input(key="path").set_value(str(workbook)).run()
     return at
 
@@ -27,7 +28,7 @@ def metric(at, label):
 
 def test_no_workbook_explains_how_to_make_one(tmp_path):
     at = AppTest.from_file(APP, default_timeout=60)
-    at.run()
+    at.switch_page(ANALYZE).run()
     at.sidebar.text_input(key="path").set_value(str(tmp_path / "missing.xlsx")).run()
 
     assert not at.exception
@@ -68,4 +69,4 @@ def test_what_if_changes_the_numbers_but_not_the_workbook(app, tmp_path):
     # At the Stress max offer, Stress breaks even and the price rule passes
     assert metric(app, "Stress profit") == "₱0"
     assert "What-if numbers in use" in app.info[0].value
-    assert workbook.read_bytes() == before  # the app never writes the workbook
+    assert workbook.read_bytes() == before  # what-ifs are never saved

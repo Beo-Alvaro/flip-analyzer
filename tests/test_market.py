@@ -9,8 +9,8 @@ import pytest
 from openpyxl import load_workbook
 
 from flip.market import (LITTLE_ROOM, LOOK, NO_FAIR, candidates, city_summary, clean,
-                         compare_foreclosures, same_subdivision, subdivision_key,
-                         write_report)
+                         compare_foreclosures, offer_window, same_subdivision,
+                         subdivision_key, write_report)
 
 
 def money(value):
@@ -266,6 +266,18 @@ def test_city_with_only_foreclosures():
 def test_candidates_best_first(compared):
     # s3 49.0%, s4 27,500 / 51,000 = 53.9%, o2 56.25%
     assert list(candidates(compared.reset_index())["link"]) == ["s3", "s4", "o2"]
+
+
+@pytest.mark.parametrize("notes, expected", [
+    ("1st auction; batch OPA1510115; offers Oct. 12, 2026 12:00 AM - Oct. 16, 2026 11:59 PM",
+     ("Oct. 12, 2026 12:00 AM - Oct. 16, 2026 11:59 PM", "2026-10-16")),
+    ("2nd auction; batch B; offers Sept. 1, 2026 12:00 AM - Sept. 5, 2026 11:59 PM",
+     ("Sept. 1, 2026 12:00 AM - Sept. 5, 2026 11:59 PM", "2026-09-05")),
+    ("negotiated sale; batch 15330; offers Oct. 17, 2026", ("Oct. 17, 2026", "")),  # no end
+    (math.nan, ("", "")),
+])
+def test_offer_window(notes, expected):
+    assert offer_window(notes) == expected
 
 
 def test_report_workbook(tmp_path):

@@ -145,7 +145,7 @@ def parse_opa_card(card: dict) -> dict | None:
     city = re.sub(r"^CITY OF ", "", card.get("city", "").strip().upper()).title()
     city = CITY_NAMES.get(city, city)
     occupancy = card.get("occupancy", "").lower()
-    start = re.match(r"([A-Z][a-z]{2})\.? (\d{1,2}), (\d{4})", card.get("dates", ""))
+    start = re.match(r"([A-Z][a-z]{2,3})\.? (\d{1,2}), (\d{4})", card.get("dates", ""))
     listed = ""
     if start:
         try:

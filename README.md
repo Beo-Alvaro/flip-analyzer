@@ -28,10 +28,13 @@ transfer tax, and registration; 3% broker commission.
 
 ## How to use
 
-1. Find a listing and 3 to 5 comparable homes nearby.
-2. Create the input workbook (`python -m flip.template`) and fill it in.
-3. Start the web app (`python -m flip.web`) and pick your house.
-4. Read the verdict, key numbers, and charts; try what-ifs.
+1. Start the web app (`python -m flip.web`). On **Market scan**, pick a
+   foreclosure and press **Start a deal** (or find a listing yourself).
+2. Find 3 to 5 comparable resale homes in its subdivision.
+3. Fill in the rest in the input workbook (`python -m flip.template`
+   creates it): renovation items, loan offers, comps.
+4. On **Analyze a house**, read the verdict, key numbers, and charts; try
+   what-ifs.
 5. Download the Excel report.
 
 **Full walkthrough with screenshots: [docs/how-to-use.md](docs/how-to-use.md)**
@@ -152,13 +155,25 @@ pip install -e ".[web]"
 python -m flip.web
 ```
 
-It opens in your browser at http://localhost:8501 and reads
-`data/deals_input.xlsx` (or a workbook you upload). Pick a house and a
-loan offer to see the verdict, the key numbers, charts of the scenarios,
-what matters most, and where the money goes, the ARV check, costs, and
-the checklist. A **What-if** panel tries different numbers on screen
-without touching your workbook, and the sidebar downloads the Excel
-report. Stop it with Ctrl+C.
+It opens in your browser at http://localhost:8501 with two pages, in the
+order of the deal cycle:
+
+- **Market scan**: import Pag-IBIG's listings (the collector snippet and
+  steps are on the page), filter every screened foreclosure (city, screen
+  result, unoccupied, offer window still open, how many are for sale in
+  the subdivision), and **Start a deal**: the house's price, floor area,
+  and location go into your workbook along with the standard checklist.
+- **Analyze a house**: pick a house and a loan offer to see the verdict,
+  the key numbers, charts of the scenarios, what matters most, and where
+  the money goes, the ARV check, costs, and the checklist. A **What-if**
+  panel tries different numbers on screen without touching your workbook,
+  and the sidebar downloads the Excel report.
+
+It uses `data/deals_input.xlsx` (an uploaded workbook is only read). The
+app saves only when you press a save button, and every save is checked
+with the same rules as the reports, refused while the file is open in
+Excel, and backed up first to a `backups` folder next to the file (kept
+out of git). Stop it with Ctrl+C.
 
 ### Market scan: where are foreclosures cheap?
 
@@ -241,13 +256,15 @@ src/flip/
   tables.py      properties + renovation items + loan offers -> one row per offer
   decision.py    break-even, what matters most, yearly ROI, safe account, verdict
   comps.py       suggested ARV from comparable sales, by kind, with warnings
-  market.py      price per sqm by city and kind; foreclosure candidates
-  pagibig.py     import Pag-IBIG's official auction lists (PDF)
+  market.py      like-for-like screen of every foreclosure; candidates
+  pagibig.py     import Pag-IBIG's listings (Online Public Auction JSON or PDF)
   draft.py       draft comps for a house from the market data
   inputs.py      load CSV or Excel input, check it for typing mistakes
   template.py    create the Excel input workbook
+  workbook.py    save into the workbook safely: checked, backed up
   export.py      write the formatted Excel report
-  app.py         the web app (Streamlit); web.py starts it
+  app.py         the web app (Streamlit): views/market.py, views/analyze.py;
+                 ui.py has shared pieces; web.py starts it
   charts.py      web app charts, colorblind-safe in light and dark mode
 tests/           hand-calculated tests for every module
 data/            SAMPLE data (made up, labeled as such)

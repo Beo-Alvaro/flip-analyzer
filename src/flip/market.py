@@ -120,8 +120,8 @@ def clean(listings: pd.DataFrame) -> pd.DataFrame:
     """
     df = listings.copy()
     df["kind"] = df["kind"].fillna("").astype(str).str.strip().str.lower().replace({"": "unknown"})
-    reason = df["kind_reason"].fillna("").astype(str).str.lower() if "kind_reason" in df else ""
-    df.loc[reason.str.contains("pasalo"), "kind"] = "pasalo"
+    reason = (df["kind_reason"] if "kind_reason" in df else pd.Series("", index=df.index))
+    df.loc[reason.fillna("").astype(str).str.lower().str.contains("pasalo"), "kind"] = "pasalo"
     # The same property is often posted more than once: same link, or the same
     # city, kind, price, and floor area under different links. Count it once.
     # But different Pag-IBIG property numbers are different houses, even at the
@@ -207,6 +207,28 @@ def _benchmark(same: pd.DataFrame, city) -> tuple[str, int, float]:
     return "none", 0, float("nan")
 
 
+DATE = re.compile(r"[A-Z][a-z]{2,3}\.? \d{1,2}, \d{4}")  # Oct. 16, 2026 or Sept. 5, 2026
+
+
+def offer_window(notes) -> tuple[str, str]:
+    """A Pag-IBIG row's offer window and, when the end is known, the day it
+    closes (YYYY-MM-DD). The notes look like "1st auction; batch OPA1510115;
+    offers Oct. 12, 2026 12:00 AM - Oct. 16, 2026 11:59 PM"; older imports
+    have only the start date, so their closing day is blank."""
+    found = re.search(r"offers (.+)$", "" if notes is None or pd.isna(notes) else str(notes))
+    if not found:
+        return "", ""
+    window = found.group(1).strip()
+    dates = DATE.findall(window)
+    closes = ""
+    if len(dates) >= 2:
+        try:
+            closes = pd.Timestamp(dates[-1].replace(".", "")).date().isoformat()
+        except ValueError:
+            pass
+    return window, closes
+
+
 def _screen(benchmark: str, ratio: float) -> str:
     if pd.isna(ratio):
         return NO_FAIR
@@ -254,10 +276,15 @@ def compare_foreclosures(listings: pd.DataFrame, summary: pd.DataFrame) -> pd.Da
     foreclosed["screen"] = [_screen(b, r) for b, r in
                             zip(foreclosed["benchmark"], foreclosed["vs_benchmark"])]
     foreclosed["order"] = foreclosed["screen"].map(SCREEN_ORDER)
+    if "notes" in foreclosed:
+        windows = [offer_window(n) for n in foreclosed["notes"]]
+        foreclosed["offer_window"] = [w for w, _ in windows]
+        foreclosed["offer_closes"] = [c for _, c in windows]
     columns = ["city", "barangay", "subdivision", "type", "price", "price_basis",
                "floor_area_sqm", "price_per_sqm", "benchmark", "benchmark_listings",
                "benchmark_per_sqm", "vs_benchmark", "vs_resale", "screen",
-               "foreclosures_in_subdivision", "occupancy", "date_listed", "link"]
+               "foreclosures_in_subdivision", "occupancy", "date_listed", "offer_window",
+               "offer_closes", "link"]
     return (foreclosed.sort_values(["order", "vs_benchmark", "city"])
             [[c for c in columns if c in foreclosed]].reset_index(drop=True))
 
@@ -327,13 +354,19 @@ def about_table(path, notes: list[str], listings: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=["Topic", "Details"])
 
 
+def scan(path) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """The market scan of a listings CSV: (cleaned listings, city summary,
+    every foreclosure compared)."""
+    listings = clean(load_listings(path))
+    summary = city_summary(listings)
+    return listings, summary, compare_foreclosures(listings, summary)
+
+
 def write_report(path, output) -> Path:
     """Build the market report workbook from a listings CSV."""
     from flip.export import write_workbook  # the same formatting as the deal report
 
-    listings = clean(load_listings(path))
-    summary = city_summary(listings)
-    compared = compare_foreclosures(listings, summary)
+    listings, summary, compared = scan(path)
     order = ["city", "kind", "kind_reason", "barangay", "subdivision", "type", "price",
              "price_basis", "floor_area_sqm", "price_per_sqm", "lot_area_sqm", "year_built",
              "date_listed", "occupancy", "excluded_reason", "source", "link", "collected"]

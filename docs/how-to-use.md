@@ -23,10 +23,11 @@ and Excel to fill in the input workbook.
 
 ![Searching foreclosed properties by province](images/how-to-use/01-search.png)
 
-**Start with the market scan.** `output/cavite_market.xlsx` (built with
-`python -m flip.market`) compares every foreclosure with similar houses
-(same subdivision, size, and type first) and runs the Step 2 quick screen
-for you. On its **Foreclosures** sheet:
+**Start with the market scan.** The web app's **Market scan** page (or
+`output/cavite_market.xlsx`, built with `python -m flip.market`) compares
+every foreclosure with similar houses (same subdivision, size, and type
+first) and runs the Step 2 quick screen for you. Each house gets one of
+three results:
 
 - **worth a closer look**: at or below 70% of a fair comparison. These are
   also on the **Candidates** sheet.
@@ -38,11 +39,13 @@ for you. On its **Foreclosures** sheet:
 
 Prefer unoccupied units, and check **Foreclosures for sale in subdivision**:
 when dozens of the same house are for sale from Pag-IBIG, you will resell
-against them.
+against them. When one looks worth pursuing, press **Start a deal** on the
+page: it adds the house to your workbook (with the standard checklist), and
+you continue with Step 2.
 
-To keep it current, collect Pag-IBIG's listings once a month with the
-browser snippet in `docs/pagibig-opa-collector.js` (instructions at its
-top), then import and rebuild:
+To keep it current, collect Pag-IBIG's listings once a month: the page's
+**Refresh Pag-IBIG listings** section has the steps, the browser snippet
+(`docs/pagibig-opa-collector.js`), and an Import button. Or in the terminal:
 
 ```bash
 python -m flip.pagibig data/market/opa_listings.json

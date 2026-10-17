@@ -63,6 +63,19 @@ palette validated for colorblind safety and contrast on Streamlit's light
 and dark backgrounds; every chart has a "See the numbers" table. Tested
 headless with Streamlit AppTest (tests/test_app.py).
 Still not modeled: loan prepayment penalty, amortizing loans.
+Single web app for the whole cycle (user chose option A: the app saves
+into deals_input.xlsx, Excel stays the source of truth). Phase 1 done:
+app.py is now a router (st.navigation) with views/market.py (refresh
+Pag-IBIG via the collector file, filter the screened foreclosures, Start
+a deal) and views/analyze.py (the former app, still read-only, what-ifs
+never saved). Every save goes through flip.workbook: refused while Excel's
+~$ lock file exists, written to a copy that must pass load_excel_inputs,
+original backed up to a backups/ folder next to it (gitignored), then
+replaced. Offer windows: notes carry the collector's full date text;
+offer_closes is blank for rows imported with only a start date.
+Next phases: 2 = edit comps, renovations, other costs, loan offers,
+checklist in the app; 3 = paste helper (resale/new/pasalo hints, pasalo
+full price and balance check) and comps fed back into the market data.
 
 ## Market scan (flip.market)
 data/market/cavite_listings.csv: ~340 public listings collected
