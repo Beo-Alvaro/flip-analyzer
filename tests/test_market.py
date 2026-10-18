@@ -9,8 +9,8 @@ import pytest
 from openpyxl import load_workbook
 
 from flip.market import (LITTLE_ROOM, LOOK, NO_FAIR, candidates, city_summary, clean,
-                         compare_foreclosures, offer_window, same_subdivision,
-                         subdivision_key, write_report)
+                         compare_foreclosures, comps_as_listings, offer_window,
+                         same_subdivision, scan, subdivision_key, write_report)
 
 
 def money(value):
@@ -295,3 +295,42 @@ def test_report_workbook(tmp_path):
     assert b["Foreclosed vs benchmark"] == pytest.approx(0.60)
     assert wb["Candidates"].max_row == 2  # header + a6
     assert wb["Foreclosures"].max_row == 5  # header + a6, a7, b2, c2 (x1, x5 not usable)
+
+
+PROPERTIES = pd.DataFrame([{"deal_id": "TANZA-01", "city": "Tanza"},
+                           {"deal_id": "SAMPLE-01", "city": "Tanza"}])
+COMPS = pd.DataFrame([
+    {"deal_id": "TANZA-01", "subdivision": "Maple Grove", "kind": "resale", "price": 1_600_000,
+     "floor_area_sqm": 40, "link": None},                                     # 40,000/sqm
+    {"deal_id": "tanza-01", "subdivision": "Maple Grove, Brgy. X", "kind": "Resale",
+     "price": 1_680_000, "floor_area_sqm": 40, "link": "https://example.com/a"},  # 42,000
+    {"deal_id": "TANZA-01", "subdivision": "Maple Grove", "kind": "pasalo", "price": 400_000,
+     "floor_area_sqm": 40, "link": None},                                     # cash-out only
+    {"deal_id": "SAMPLE-01", "subdivision": "Maple Grove", "kind": "resale", "price": 9_000_000,
+     "floor_area_sqm": 40, "link": None},                                     # made up
+])
+
+
+def test_comps_as_listings():
+    rows = comps_as_listings(PROPERTIES, COMPS)
+
+    # The two resale comps; not the pasalo, not the example
+    assert list(rows["price"]) == [1_600_000, 1_680_000]
+    assert set(rows["city"]) == {"Tanza"}  # from their house
+    assert list(rows["link"]) == ["comp:TANZA-01:row 2", "https://example.com/a"]
+
+
+def test_comps_give_foreclosures_a_fair_comparison(tmp_path):
+    path = tmp_path / "listings.csv"
+    pd.DataFrame([sub("Tanza", "foreclosed", 1_200_000, 40, "MAPLE GROVE PH 3", "m5")]).to_csv(
+        path, index=False)
+
+    _, _, without = scan(path)
+    assert without.loc[0, "screen"] == NO_FAIR  # nothing to compare with
+
+    _, _, compared = scan(path, comps_as_listings(PROPERTIES, COMPS))
+    m5 = compared.iloc[0]
+    # Resale comps 40,000 and 42,000 per sqm -> median 41,000; 30,000 / 41,000 = 73.2%
+    assert (m5["benchmark"], m5["benchmark_listings"]) == ("same subdivision: resale", 2)
+    assert m5["vs_benchmark"] == pytest.approx(30_000 / 41_000)
+    assert m5["screen"] == LITTLE_ROOM

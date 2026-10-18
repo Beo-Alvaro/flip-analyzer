@@ -164,10 +164,18 @@ the order of the deal cycle:
   result, unoccupied, offer window still open, how many are for sale in
   the subdivision), and **Start a deal**: the house's price, floor area,
   and location go into your workbook along with the standard checklist.
+  The resale and new comps in your workbook count as listings too, so
+  every comp you add makes the scan fairer for its whole subdivision.
 - **Edit a house**: its numbers (price, ARV, months, holding cost...) and
   tables for renovation items, other costs, loan offers, comps, and the
   checklist, with the suggested ARV updating as you type comps. One
   **Save changes** button saves only what you changed; **Discard** undoes.
+  **Paste a listing** (on the Comps tab) reads a post's text: it suggests
+  resale, new, pasalo, or foreclosed and shows the phrases that say so,
+  fills in the price, floor and lot area, and condition it finds, and for a
+  pasalo works out the full price (cash-out + what is still owed, checked
+  against the loan terms). Only the fields you confirm are saved, never the
+  pasted text.
 - **Analyze a house**: pick a house and a loan offer to see the verdict,
   the key numbers, charts of the scenarios, what matters most, and where
   the money goes, the ARV check, costs, and the checklist. A **What-if**
@@ -199,7 +207,9 @@ comparison go to the **Candidates** sheet; "no fair comparison" means
 collect resale prices from that subdivision first.
 `data/market/cavite_listings.csv` holds about 1,500 public Cavite listings
 collected in October 2026 (FazWaz plus every Pag-IBIG house); add rows you
-find yourself and run it again.
+find yourself and run it again. Add `--workbook data/deals_input.xlsx` to
+also use the resale and new comps you entered for your houses (the web
+app does this by default).
 
 ### Keep it current: import Pag-IBIG's listings
 
@@ -268,6 +278,7 @@ src/flip/
   template.py    create the Excel input workbook
   workbook.py    save into the workbook safely: checked, backed up
   editing.py     the Edit page's conversions (rates as %, dates as text)
+  listing_text.py  read a pasted listing: kind, numbers, pasalo full price
   export.py      write the formatted Excel report
   app.py         the web app (Streamlit): views/market.py, views/edit.py,
                  views/analyze.py; ui.py has shared pieces; web.py starts it

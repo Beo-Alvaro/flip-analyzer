@@ -14,7 +14,7 @@ import pandas as pd
 import streamlit as st
 
 from flip.inputs import InputError, load_excel_inputs
-from flip.market import LITTLE_ROOM, LOOK, NO_FAIR, scan
+from flip.market import LITTLE_ROOM, LOOK, NO_FAIR, scan, workbook_comps
 from flip.pagibig import import_opa, merge_into
 from flip.template import STANDARD_CHECKLIST
 from flip.ui import DEFAULT_LISTINGS, peso, uploaded_workbook, workbook_path
@@ -25,9 +25,11 @@ SHORT = {LOOK: "Worth a closer look", LITTLE_ROOM: "Little room", NO_FAIR: "No f
 
 
 @st.cache_data(show_spinner="Screening every foreclosure...")
-def cached_scan(path: str, modified: float) -> pd.DataFrame:
-    """Every usable foreclosure, compared; cached until the file changes."""
-    return scan(path)[2]
+def cached_scan(path: str, modified: float, workbook: str, workbook_modified: float):
+    """Every usable foreclosure compared, and how many of your comps were used;
+    cached until either file changes."""
+    comps = workbook_comps(workbook) if workbook else None
+    return scan(path, comps)[2], 0 if comps is None else len(comps)
 
 
 def text(value) -> str:
@@ -62,6 +64,9 @@ with st.sidebar:
     st.header("Market data")
     listings_path = Path(st.text_input("Listings file", value=DEFAULT_LISTINGS,
                                        key="listings_path"))
+    use_comps = st.checkbox("Also use the comps in my workbook", value=True, key="use_comps",
+                            help="Your resale and new comps (not the SAMPLE examples) count "
+                                 "as listings in their house's city, so each comp is typed once.")
 
 # --- 0. Refresh Pag-IBIG's listings ---
 
@@ -107,8 +112,19 @@ if not listings_path.exists():
 
 # --- 1. Every foreclosure, screened ---
 
-compared = cached_scan(str(listings_path), listings_path.stat().st_mtime)
+workbook = workbook_path()
+comps_from = workbook if use_comps and uploaded_workbook() is None and workbook.exists() else None
+try:
+    compared, comps_used = cached_scan(str(listings_path), listings_path.stat().st_mtime,
+                                       str(comps_from or ""),
+                                       comps_from.stat().st_mtime if comps_from else 0.0)
+except InputError:  # the workbook needs fixing first: scan without its comps
+    compared, comps_used = cached_scan(str(listings_path), listings_path.stat().st_mtime, "", 0.0)
+    st.caption("Your workbook has problems to fix (see Analyze a house), so its comps "
+               "aren't used here yet.")
 st.subheader("Foreclosures")
+if comps_used:
+    st.caption(f"Includes {comps_used} resale and new comps from your workbook.")
 left, middle, right = st.columns(3)
 cities = left.multiselect("City", sorted(compared["city"].dropna().unique()), key="cities",
                           placeholder="All cities")

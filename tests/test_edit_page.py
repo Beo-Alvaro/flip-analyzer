@@ -10,6 +10,7 @@ from streamlit.testing.v1 import AppTest
 from flip.inputs import load_excel_inputs
 from flip.template import STANDARD_CHECKLIST, create_template
 from flip.workbook import add_deal
+from test_listing_text import PASALO, RESALE
 
 APP = str(Path(__file__).parent.parent / "src" / "flip" / "app.py")
 EDIT, ANALYZE = "views/edit.py", "views/analyze.py"
@@ -96,3 +97,54 @@ def test_a_new_house_gets_the_standard_checklist(workbook):
     mine = checklist[checklist["deal_id"] == "TANZA-01"]
     assert list(mine["item"]) == STANDARD_CHECKLIST
     assert set(mine["status"]) == {"open"}
+
+
+# --- Paste a listing (posts from tests/test_listing_text.py) ---
+
+def test_paste_a_resale(workbook):
+    at = open_edit(workbook)
+    at.text_area(key="paste_SAMPLE-01_0").set_value(RESALE).run()
+    assert "Looks like **resale**" in at.info[0].value
+    assert at.button(key="p_add_SAMPLE-01_0").disabled  # the post has no floor area
+
+    at.number_input(key="p_floor_SAMPLE-01_0").set_value(60).run()  # asked the seller
+    at.button(key="p_add_SAMPLE-01_0").click().run()
+
+    assert "Saved SAMPLE-01 (comp added)" in at.success[0].value
+    comps = load_excel_inputs(workbook).comps
+    assert len(comps[comps["deal_id"] == "SAMPLE-01"]) == 4  # the 3 examples + this one
+    new = comps[comps["price"] == 2_500_000].iloc[0]
+    assert (new["kind"], new["floor_area_sqm"], new["lot_area_sqm"]) == ("resale", 60, 36)
+    # Resale comps per sqm: 48,000, 50,000, 52,000 and 2,500,000 / 60 = 41,667.
+    # Median (48,000 + 50,000) / 2 = 49,000 x 84 sqm = 4,116,000
+    metrics = {m.label: m.value for m in at.metric}
+    assert metrics["Suggested ARV"] == "₱4,116,000"
+
+
+def test_paste_a_pasalo(workbook):
+    at = open_edit(workbook)
+    at.text_area(key="paste_SAMPLE-01_0").set_value(PASALO).run()
+    assert "Looks like **pasalo**" in at.info[0].value
+    at.number_input(key="p_left_SAMPLE-01_0").set_value(81).run()  # 99 of 180 paid
+
+    metrics = {m.label: m.value for m in at.metric}
+    assert metrics["Balance the loan terms imply"] == "₱679,075"  # see test_listing_text.py
+    # 679,075 - 400,000 claimed
+    assert any("differ by ₱279,075" in w.value for w in at.warning)
+
+    at.button(key="p_add_SAMPLE-01_0").click().run()  # the cautious price is chosen first
+    comps = load_excel_inputs(workbook).comps
+    new = comps[comps["price"] == 1_500_000].iloc[0]  # 1,100,000 cash-out + 400,000
+    assert (new["kind"], new["floor_area_sqm"]) == ("resale", 50)
+    assert new["condition"] == ("bare (not finished); pasalo: cash-out + the seller's "
+                                "balance figure, unconfirmed")
+
+
+def test_paste_waits_for_other_changes(workbook):
+    at = open_edit(workbook)
+    at.number_input(key="arv_SAMPLE-01_0").set_value(4_300_000)
+    at.text_area(key="paste_SAMPLE-01_0").set_value(RESALE)
+    at.run()
+    at.number_input(key="p_floor_SAMPLE-01_0").set_value(60).run()
+
+    assert at.button(key="p_add_SAMPLE-01_0").disabled  # the ARV change isn't saved yet

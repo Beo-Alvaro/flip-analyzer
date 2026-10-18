@@ -34,8 +34,9 @@ three results:
 - **little room**: near what similar houses cost, even new ones. Skip.
 - **no fair comparison**: cheaper than new units elsewhere in the city,
   but nothing similar to compare with. Collect a few resale prices from
-  its subdivision (Step 2), add them to the listings CSV as `resale`, and
-  rebuild. One subdivision's prices cover all its foreclosures.
+  its subdivision (Step 2) and add them as comps: the app's scan uses the
+  resale and new comps in your workbook, so one subdivision's prices then
+  cover all its foreclosures.
 
 Prefer unoccupied units, and check **Foreclosures for sale in subdivision**:
 when dozens of the same house are for sale from Pag-IBIG, you will resell
@@ -91,6 +92,15 @@ after renovation. Good comps are:
 
 For each comp, write down: subdivision, link, type, **floor area**, lot
 area, price, condition, and date listed.
+
+**Or paste it.** On the app's **Edit a house** page, Comps tab, open
+**Paste a listing** and paste the post's text. The app suggests the kind
+(resale, new, pasalo, foreclosed) and shows the phrases that gave it away,
+fills in the numbers it finds, and asks for anything missing (often the
+floor area: ask the seller). For a pasalo it works out the full price,
+cash-out plus what is still owed, and warns when the seller's balance
+doesn't match the loan terms. Only the fields you confirm are saved, never
+the pasted text.
 
 **Start with drafts.** Add the house to the Properties sheet (Step 4) with
 its `city`, `barangay`, `subdivision`, and `type`, then run

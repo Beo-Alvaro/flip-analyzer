@@ -83,8 +83,17 @@ via workbook.save_house; a house's rows are replaced in place and other
 houses' cells are kept as they were. Formulas in the tables block saving
 (openpyxl can't recalculate them). The House picker follows you across
 pages (session key current_deal).
-Next: phase 3 = paste helper (resale/new/pasalo hints, pasalo full price
-and balance check) and comps fed back into the market data.
+Phase 3 done: flip.listing_text reads a pasted post (kind from the
+how-to-use signs, pasalo first; labeled amounts only right after their
+label; areas as whole words; "50/60 lot/hse"); payments_left + loan_balance
+(present value of the payments left, annual rate / 12) give a pasalo's full
+price. Edit page Comps tab: Paste a listing; Add as a comp saves at once,
+so it waits for other unsaved changes; a pasalo is recorded as resale at the
+chosen full price (default the lower, more cautious one) with a condition
+note. The pasted text is never saved. Comps feed the scan without copying:
+market.comps_as_listings (resale and new only, city from the house, SAMPLE
+deals skipped) via scan(path, extra); the Market page includes them by
+default, the CLI with --workbook.
 
 ## Market scan (flip.market)
 data/market/cavite_listings.csv: ~340 public listings collected

@@ -13,6 +13,7 @@ from flip.batch import load_deals
 from flip.inputs import load_excel_inputs
 from flip.market import LITTLE_ROOM, LOOK, NO_FAIR
 from flip.template import STANDARD_CHECKLIST, create_template
+from flip.workbook import add_deal, save_house
 
 APP = str(Path(__file__).parent.parent / "src" / "flip" / "app.py")
 OPEN = "1st auction; batch B1; offers Dec. 1, 2099 12:00 AM - Dec. 5, 2099 11:59 PM"
@@ -154,3 +155,25 @@ def test_import_collector_file(app, files, tmp_path):
     assert len(list((tmp_path / "backups").iterdir())) == 1
     # 1,200,000 / 40 = 30,000 per sqm; 30,000 / 51,000 = 58.8%: also worth a closer look
     assert list(table(app)["link"]) == ["pagibig:815200000000001", "pagibig:815200000000009"]
+
+
+def test_workbook_comps_are_used(app, files):
+    add_deal(files["workbook"], {"deal_id": "TANZA-01", "purchase_price": 1_000_000,
+                                 "arv": 1_500_000, "holding_months": 6,
+                                 "monthly_holding_cost": 5_000, "city": "Tanza"})
+    save_house(files["workbook"], "TANZA-01", tables={"Comps": [
+        {"deal_id": "TANZA-01", "subdivision": "Sunrise Homes", "kind": "resale",
+         "price": 1_600_000, "floor_area_sqm": 40},   # 40,000 per sqm
+        {"deal_id": "TANZA-01", "subdivision": "Sunrise Homes", "kind": "resale",
+         "price": 1_680_000, "floor_area_sqm": 40}]})  # 42,000 per sqm
+    app.run()
+
+    row = table(app).iloc[0]
+    # Resale in the same subdivision now comes first: median 41,000 per sqm;
+    # 25,000 / 41,000 = 61.0%
+    assert row["benchmark"] == "same subdivision: resale"
+    assert row["vs_benchmark"] == pytest.approx(25_000 / 41_000)
+    assert any("Includes 2 resale and new comps" in c.value for c in app.caption)
+
+    app.sidebar.checkbox(key="use_comps").uncheck().run()
+    assert table(app).iloc[0]["benchmark"] == "same subdivision: new (ceiling)"

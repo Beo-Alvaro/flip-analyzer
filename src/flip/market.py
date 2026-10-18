@@ -19,7 +19,8 @@ candidates. Each also shows how many foreclosures are for sale in its
 subdivision: when you resell, those are your competition.
 
 Run `python -m flip.market data/market/cavite_listings.csv` to write
-output/market_report.xlsx.
+output/market_report.xlsx. Add `--workbook data/deals_input.xlsx` to also
+compare with the resale and new comps you entered for your houses.
 """
 
 import argparse
@@ -354,19 +355,67 @@ def about_table(path, notes: list[str], listings: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=["Topic", "Details"])
 
 
-def scan(path) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """The market scan of a listings CSV: (cleaned listings, city summary,
-    every foreclosure compared)."""
-    listings = clean(load_listings(path))
+def comps_as_listings(properties: pd.DataFrame, comps: pd.DataFrame | None) -> pd.DataFrame:
+    """Your workbook's resale and new comps as market listings, so the scan
+    compares foreclosures with them too and each comp is typed only once.
+
+    A comp takes its house's city. Example comps (deal_id SAMPLE-...) are left
+    out, and so are foreclosed and pasalo comps (the scan has Pag-IBIG's own
+    rows, and a pasalo's listed price is only the cash-out).
+    """
+    if comps is None or comps.empty or "city" not in properties:
+        return pd.DataFrame()
+    cities = {str(d).strip().upper(): c for d, c in zip(properties["deal_id"], properties["city"])}
+    rows = []
+    for number, comp in comps.iterrows():
+        deal = str(comp["deal_id"]).strip()
+        kind = str(comp.get("kind") or "").strip().lower()
+        city = cities.get(deal.upper())
+        if deal.upper().startswith("SAMPLE") or kind not in ("resale", "new") \
+                or city is None or pd.isna(city):
+            continue
+        link = comp.get("link")
+        rows.append({
+            "city": city, "subdivision": comp.get("subdivision"), "type": comp.get("type"),
+            "kind": kind, "kind_reason": f"your comp for {deal}", "price": comp.get("price"),
+            "price_basis": "asking", "floor_area_sqm": comp.get("floor_area_sqm"),
+            "lot_area_sqm": comp.get("lot_area_sqm"), "date_listed": comp.get("date_listed"),
+            "source": "your workbook's comps",
+            # A unique link even when none was typed, so repeats are judged by the rest
+            "link": link if isinstance(link, str) and link.strip()
+            else f"comp:{deal}:row {number + 2}",
+        })
+    return pd.DataFrame(rows)
+
+
+def scan(path, extra: pd.DataFrame | None = None) -> tuple[pd.DataFrame, pd.DataFrame,
+                                                             pd.DataFrame]:
+    """The market scan of a listings CSV, plus any extra listings (e.g. from
+    comps_as_listings): (cleaned listings, city summary, every foreclosure
+    compared). The CSV's rows come first, so a comp that repeats one of its
+    listings counts once."""
+    listings = load_listings(path)
+    if extra is not None and not extra.empty:
+        listings = pd.concat([listings, extra], ignore_index=True)
+    listings = clean(listings)
     summary = city_summary(listings)
     return listings, summary, compare_foreclosures(listings, summary)
 
 
-def write_report(path, output) -> Path:
-    """Build the market report workbook from a listings CSV."""
+def workbook_comps(workbook) -> pd.DataFrame:
+    """comps_as_listings() for an input workbook (made by `python -m flip.template`)."""
+    from flip.inputs import load_excel_inputs
+
+    inputs = load_excel_inputs(workbook)
+    return comps_as_listings(inputs.properties, inputs.comps)
+
+
+def write_report(path, output, workbook=None) -> Path:
+    """Build the market report workbook from a listings CSV (and, if given, the
+    resale and new comps in an input workbook)."""
     from flip.export import write_workbook  # the same formatting as the deal report
 
-    listings, summary, compared = scan(path)
+    listings, summary, compared = scan(path, workbook_comps(workbook) if workbook else None)
     order = ["city", "kind", "kind_reason", "barangay", "subdivision", "type", "price",
              "price_basis", "floor_area_sqm", "price_per_sqm", "lot_area_sqm", "year_built",
              "date_listed", "occupancy", "excluded_reason", "source", "link", "collected"]
@@ -387,8 +436,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Price per sqm by city: new, resale, foreclosed.")
     parser.add_argument("path", help="listings CSV, e.g. data/market/cavite_listings.csv")
     parser.add_argument("--output", default="output/market_report.xlsx")
+    parser.add_argument("--workbook", help="also use the resale and new comps in this input "
+                                           "workbook, e.g. data/deals_input.xlsx")
     args = parser.parse_args()
     try:
-        print(f"Wrote {write_report(args.path, args.output)}")
+        print(f"Wrote {write_report(args.path, args.output, args.workbook)}")
     except PermissionError as error:
         sys.exit(f"Can't write {error.filename}. If it is open in Excel, close it and run again.")
