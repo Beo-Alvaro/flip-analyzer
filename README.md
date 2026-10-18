@@ -175,12 +175,20 @@ the order of the deal cycle:
   tables for renovation items, other costs, loan offers, comps, and the
   checklist, with the suggested ARV updating as you type comps. One
   **Save changes** button saves only what you changed; **Discard** undoes.
-  **Paste a listing** (on the Comps tab) reads a post's text: it suggests
-  resale, new, pasalo, or foreclosed and shows the phrases that say so,
-  fills in the price, floor and lot area, and condition it finds, and for a
-  pasalo works out the full price (cash-out + what is still owed, checked
-  against the loan terms). Only the fields you confirm are saved, never the
-  pasted text.
+  The Comps tab also helps find comps:
+  - **Find comps online** opens ready-made searches for the house's
+    subdivision (Facebook Marketplace and posts, Google across the listing
+    sites) in your own browser, where you're logged in.
+  - **Draft from the market data** lists the most similar listings (same
+    city, similar size and type, closest places first); tick and add them.
+  - **Paste listings** reads posts' text (several at once, separated by a
+    `---` line): it suggests resale, new, pasalo, or foreclosed and shows
+    the phrases that say so, fills in the price, floor and lot area, and
+    condition, and for a pasalo works out the full price (cash-out + what
+    is still owed, checked against the loan terms). Only the fields you
+    confirm are saved, never the pasted text. It keeps score: each time you
+    add pasted comps it records its guesses against what you saved (in
+    `data/paste_log.csv`, no listing text) and shows how often it was right.
 - **Analyze a house**: pick a house and a loan offer to see the verdict,
   the key numbers, charts of the scenarios, what matters most, and where
   the money goes, the ARV check, costs, and the checklist. A **What-if**

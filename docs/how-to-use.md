@@ -93,20 +93,26 @@ after renovation. Good comps are:
 For each comp, write down: subdivision, link, type, **floor area**, lot
 area, price, condition, and date listed.
 
-**Or paste it.** On the app's **Edit a house** page, Comps tab, open
-**Paste a listing** and paste the post's text. The app suggests the kind
-(resale, new, pasalo, foreclosed) and shows the phrases that gave it away,
-fills in the numbers it finds, and asks for anything missing (often the
-floor area: ask the seller). For a pasalo it works out the full price,
-cash-out plus what is still owed, and warns when the seller's balance
-doesn't match the loan terms. Only the fields you confirm are saved, never
-the pasted text.
+**In the app**, the **Edit a house** page's Comps tab has three helpers:
 
-**Start with drafts.** Add the house to the Properties sheet (Step 4) with
-its `city`, `barangay`, `subdivision`, and `type`, then run
-`python -m flip.draft YOUR-DEAL-ID`. The most similar listings from the
-market data land on the Comps sheet marked DRAFT. Check each one, delete
-the poor matches, and add the comps you find yourself.
+1. **Find comps online**: one-click searches for the house's subdivision
+   (Facebook Marketplace, Facebook posts and groups, and Google across the
+   listing sites), opened in your own browser.
+2. **Draft from the market data**: the most similar listings the app
+   already has (same city, floor area within 25%, same type group, closest
+   places first). Untick poor matches and add the rest; they are marked
+   DRAFT. (Terminal: `python -m flip.draft YOUR-DEAL-ID`.)
+3. **Paste listings**: paste a post's text, or several posts with a line of
+   `---` between them. The app suggests the kind (resale, new, pasalo,
+   foreclosed) and shows the phrases that gave it away, fills in the
+   numbers it finds, and asks for anything missing (often the floor area:
+   ask the seller). For a pasalo it works out the full price, cash-out plus
+   what is still owed, and warns when the seller's balance doesn't match
+   the loan terms. Only the fields you confirm are saved, never the pasted
+   text, and the app keeps score of how often its guesses were right.
+
+Drafts need the house's city (and help from its barangay, subdivision, and
+type), which Start a deal fills in for you.
 
 **Where to find resale homes**
 - Listing sites (FazWaz, Lamudi, Dot Property, OnePropertee, Carousell).

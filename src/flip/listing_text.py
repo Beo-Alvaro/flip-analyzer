@@ -139,6 +139,32 @@ def read_listing(text: str) -> dict:
     }
 
 
+SEPARATOR = re.compile(r"^\s*(?:-{3,}|={3,})\s*$", re.MULTILINE)
+PASALO_NOTE = "pasalo: cash-out + the seller's balance figure, unconfirmed"
+
+
+def split_posts(text: str) -> list[str]:
+    """Several pasted posts, separated by a line of --- (or ===)."""
+    return [post.strip() for post in SEPARATOR.split(text) if post.strip()]
+
+
+def suggested_comp(found: dict) -> dict:
+    """The comp a post suggests (from read_listing): its kind and numbers.
+
+    A pasalo's price is its full price when both the cash-out and the
+    seller's balance are in the post (cash-out + balance, the cautious
+    figure); otherwise it is left blank for you to fill in.
+    """
+    price, note = found["price"], ""
+    if found["kind"] == "pasalo":
+        has_both = found["cash_out"] is not None and found["balance"] is not None
+        price = found["cash_out"] + found["balance"] if has_both else None
+        note = PASALO_NOTE
+    return {"kind": found["kind"], "price": price, "floor_area_sqm": found["floor_area_sqm"],
+            "lot_area_sqm": found["lot_area_sqm"], "type": found["type"],
+            "condition": found["condition"], "note": note}
+
+
 def payments_left(started: date, term_months: int, today: date) -> int:
     """Monthly payments still to make, one a month on the day payments started.
     Started 2018-08-16, 180 months, on 2026-10-18: 99 made (Aug 2018 to Oct

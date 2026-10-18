@@ -94,6 +94,20 @@ note. The pasted text is never saved. Comps feed the scan without copying:
 market.comps_as_listings (resale and new only, city from the house, SAMPLE
 deals skipped) via scan(path, extra); the Market page includes them by
 default, the CLI with --workbook.
+Comp-finding helpers (user-approved recommendation: semi-automated, since
+the resale-rich sites block automated reading or need a login): Comps tab
+panels Find comps online (flip.find_comps: Facebook Marketplace/posts
+and Google site: searches, opened in the user's own browser), Draft from
+the market data (draft.new_drafts + comp_row; the flip.draft CLI now
+saves through flip.workbook too), and Paste listings (several posts split
+on a --- line, reviewed as rows). flip.paste_log keeps score per added
+pasted comp (guessed vs chosen kind; price/floor/lot kept, changed, added,
+missing) in data/paste_log.csv (gitignored, no listing text); the page
+shows the scores. Checklist: no longer auto-prefilled (it counted as an
+unsaved change forever and blocked adding comps); an "Add the 8 standard
+items" button saves them instead.
+Collector verified by the user 2026-10-18: 1,538 properties, 1,482 houses
+(477 unoccupied), every row with its offer closing date.
 
 ## Market scan (flip.market)
 data/market/cavite_listings.csv: ~340 public listings collected

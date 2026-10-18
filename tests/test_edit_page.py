@@ -4,13 +4,15 @@ Expected numbers are the hand-calculated anchor deal (docs/project-context.md).
 
 from pathlib import Path
 
+import pandas as pd
 import pytest
 from streamlit.testing.v1 import AppTest
 
 from flip.inputs import load_excel_inputs
 from flip.template import STANDARD_CHECKLIST, create_template
 from flip.workbook import add_deal
-from test_listing_text import PASALO, RESALE
+from test_draft import LISTINGS as MARKET
+from test_listing_text import DEVELOPER, PASALO, RESALE
 
 APP = str(Path(__file__).parent.parent / "src" / "flip" / "app.py")
 EDIT, ANALYZE = "views/edit.py", "views/analyze.py"
@@ -90,8 +92,10 @@ def test_a_new_house_gets_the_standard_checklist(workbook):
     at.switch_page(EDIT).run()
 
     assert at.selectbox(key="edit_house").value == "TANZA-01"  # the page follows
-    assert "Unsaved changes: Checklist" in at.warning[0].value
-    at.button(key="save_house").click().run()
+    assert not at.warning  # an empty checklist is not an unsaved change
+    at.button(key="checklist_add_TANZA-01_0").click().run()
+
+    assert "Saved TANZA-01 (checklist added)" in at.success[0].value
 
     checklist = load_excel_inputs(workbook).checklist
     mine = checklist[checklist["deal_id"] == "TANZA-01"]
@@ -104,7 +108,7 @@ def test_a_new_house_gets_the_standard_checklist(workbook):
 def test_paste_a_resale(workbook):
     at = open_edit(workbook)
     at.text_area(key="paste_SAMPLE-01_0").set_value(RESALE).run()
-    assert "Looks like **resale**" in at.info[0].value
+    assert any("Looks like **resale**" in i.value for i in at.info)
     assert at.button(key="p_add_SAMPLE-01_0").disabled  # the post has no floor area
 
     at.number_input(key="p_floor_SAMPLE-01_0").set_value(60).run()  # asked the seller
@@ -124,7 +128,7 @@ def test_paste_a_resale(workbook):
 def test_paste_a_pasalo(workbook):
     at = open_edit(workbook)
     at.text_area(key="paste_SAMPLE-01_0").set_value(PASALO).run()
-    assert "Looks like **pasalo**" in at.info[0].value
+    assert any("Looks like **pasalo**" in i.value for i in at.info)
     at.number_input(key="p_left_SAMPLE-01_0").set_value(81).run()  # 99 of 180 paid
 
     metrics = {m.label: m.value for m in at.metric}
@@ -148,3 +152,61 @@ def test_paste_waits_for_other_changes(workbook):
     at.number_input(key="p_floor_SAMPLE-01_0").set_value(60).run()
 
     assert at.button(key="p_add_SAMPLE-01_0").disabled  # the ARV change isn't saved yet
+
+
+def test_paste_several_posts(workbook):
+    at = open_edit(workbook)
+    at.text_area(key="paste_SAMPLE-01_0").set_value(f"{DEVELOPER}\n---\n{PASALO}\n---\n{RESALE}")
+    at.run()
+    assert any("3 posts" in i.value for i in at.info)
+
+    # Only the pasalo post has both a price and a floor area, so only it is ticked
+    at.button(key="batch_add_SAMPLE-01_0").click().run()
+
+    assert "Saved SAMPLE-01 (comp added)" in at.success[0].value
+    comps = load_excel_inputs(workbook).comps
+    new = comps[comps["price"] == 1_500_000].iloc[0]  # 1,100,000 cash-out + 400,000 balance
+    assert (new["kind"], new["floor_area_sqm"], new["lot_area_sqm"]) == ("resale", 50, 36)
+    assert new["condition"] == ("bare (not finished); pasalo: cash-out + the seller's "
+                                "balance figure, unconfirmed")
+    log = pd.read_csv(workbook.parent / "paste_log.csv")
+    assert (log.loc[0, "guessed_kind"], log.loc[0, "chosen_kind"]) == ("pasalo", "pasalo")
+    assert list(log.loc[0, ["price_outcome", "floor_area_sqm_outcome",
+                            "lot_area_sqm_outcome"]]) == ["kept", "kept", "kept"]
+
+
+def test_the_reader_keeps_score(workbook):
+    at = open_edit(workbook)
+    at.text_area(key="paste_SAMPLE-01_0").set_value(RESALE).run()
+    at.number_input(key="p_floor_SAMPLE-01_0").set_value(60).run()
+    at.button(key="p_add_SAMPLE-01_0").click().run()
+
+    # Kind guessed right; price and lot area read and kept; floor area typed in
+    assert any("How the reader has done so far: Kind: right 1 of 1 (100%) · Price: found in "
+               "1 of 1, kept as read 1 of 1 · Floor area: found in 0 of 1 · Lot area: found "
+               "in 1 of 1, kept as read 1 of 1." in c.value for c in at.caption)
+
+
+def test_draft_from_the_market_data(tmp_path):
+    workbook = create_template(tmp_path / "deals_input.xlsx")
+    add_deal(workbook, {"deal_id": "TANZA-01", "purchase_price": 1_201_368, "arv": 1_720_000,
+                        "holding_months": 10, "monthly_holding_cost": 3_000,
+                        "floor_area_sqm": 46.2, "source_url": "pagibig:999", "city": "Tanza",
+                        "barangay": "Bucal", "subdivision": "Springtown Southgate",
+                        "type": "townhouse"})
+    listings = tmp_path / "listings.csv"
+    MARKET.to_csv(listings, index=False)
+    at = open_edit(workbook)
+    at.session_state["listings_path"] = str(listings)
+    at.switch_page(ANALYZE).run()
+    at.session_state["current_deal"] = "TANZA-01"
+    at.switch_page(EDIT).run()
+
+    at.button(key="drafts_add_TANZA-01_0").click().run()  # all ticked by default
+
+    assert "Saved TANZA-01 (5 drafted comps added)" in at.success[0].value
+    comps = load_excel_inputs(workbook).comps
+    # The same picks as tests/test_draft.py: 3 resale (closest place first), 2 new
+    assert list(comps[comps["deal_id"] == "TANZA-01"]["link"]) == ["r1", "r2", "r3", "n3", "n2"]
+    assert any("No similar listings in the market data for this house yet" in c.value
+               for c in at.caption)  # all of them are comps now

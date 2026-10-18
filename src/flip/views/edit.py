@@ -1,5 +1,6 @@
 """Edit a house: its details, renovation items, other costs, loan offers,
-comps, and checklist. A pasted listing can be read into a comp (flip.listing_text).
+comps, and checklist. The Comps tab also finds comps: one-click searches,
+drafts from the market data, and pasted posts read into comps.
 
 Everything is saved together with one button, through flip.workbook
 (checked, backed up, never while Excel has it open). Only what you changed is
@@ -7,17 +8,24 @@ written, and other houses' rows are never touched.
 """
 
 from datetime import date
+from pathlib import Path
 
 import pandas as pd
 import streamlit as st
 
 from flip.analyzer import TAX_MODES
 from flip.comps import KINDS, suggested_arv
+from flip.draft import comp_row, new_drafts
 from flip.editing import ISO_DATE, NUMBERS, PERCENT, from_editor, to_editor
-from flip.listing_text import loan_balance, payments_left, read_listing
+from flip.find_comps import search_links
 from flip.inputs import CHECKLIST_STATUSES, REQUIRED, SHEETS, InputError
+from flip.listing_text import (loan_balance, payments_left, read_listing, split_posts,
+                               suggested_comp)
+from flip.market import clean, load_listings
+from flip.paste_log import entry, log_entries, reader_scores
 from flip.template import STANDARD_CHECKLIST
-from flip.ui import load_inputs, peso, pick_house, uploaded_workbook, workbook_path
+from flip.ui import (DEFAULT_LISTINGS, load_inputs, peso, pick_house, uploaded_workbook,
+                     workbook_path)
 from flip.workbook import WorkbookBusy, save_house
 
 TABLES = [  # (table, tab title, what goes in it)
@@ -154,11 +162,6 @@ for (table, title, explanation), tab in zip(TABLES, tabs[1:]):
         st.caption(explanation)
         shown = to_editor(rows, deal_id)
         before[table] = from_editor(shown, deal_id)
-        if table == "checklist" and shown.empty:
-            shown = pd.DataFrame({column: pd.Series([None] * len(STANDARD_CHECKLIST), dtype=object)
-                                  for column in shown.columns})
-            shown["item"], shown["status"] = STANDARD_CHECKLIST, "open"
-            st.caption("The standard items are filled in for you; press Save to keep them.")
         edited = st.data_editor(shown, num_rows="dynamic", hide_index=True, width="stretch",
                                 column_config=column_config(table, shown.columns), key=key(table))
         now[table] = from_editor(edited, deal_id)
@@ -194,14 +197,17 @@ st.divider()
 if changed:
     st.warning(f"Unsaved changes: {', '.join(changed)}", icon=":material/edit_note:")
 buttons = st.container(horizontal=True)
-save_clicked = buttons.button("Save changes", type="primary", disabled=not changed, key="save_house",
-                      icon=":material/save:")
+save_clicked = buttons.button("Save changes", type="primary", disabled=not changed,
+                              key="save_house", icon=":material/save:")
 discard = buttons.button("Discard changes", disabled=not changed, key="discard_house")
 if discard:
     st.session_state["edit_version"] = version + 1
     st.rerun()
-def save_and_reload(house: dict | None, tables: dict, what: str) -> None:
-    """Save through flip.workbook; on success, reload the page with the saved data."""
+
+
+def save_and_reload(house: dict | None, tables: dict, what: str, after=None) -> None:
+    """Save through flip.workbook. On success, run after() if given, then reload
+    the page with the saved data."""
     try:
         saved = save_house(path, deal_id, house, tables)
     except WorkbookBusy as error:
@@ -210,6 +216,8 @@ def save_and_reload(house: dict | None, tables: dict, what: str) -> None:
         st.error("Not saved. The workbook would have these problems:")
         st.code(str(error), language=None)
     else:
+        if after:
+            after()
         st.session_state["edit_saved"] = (f"Saved {deal_id} ({what}). The previous version is "
                                           f"backed up at `{saved}`.")
         st.session_state["edit_version"] = version + 1
@@ -217,9 +225,102 @@ def save_and_reload(house: dict | None, tables: dict, what: str) -> None:
 
 
 if save_clicked:
-    save_and_reload(changed_house or None, {SHEETS[t]: now[t] for t in changed_tables}, ", ".join(changed))
+    save_and_reload(changed_house or None, {SHEETS[t]: now[t] for t in changed_tables},
+                    ", ".join(changed))
 
-# --- Paste a listing (at the end of the Comps tab) ---
+# --- Finding comps (at the end of the Comps tab) ---
+
+LOG = path.parent / "paste_log.csv"  # how well the listing reader guesses (flip.paste_log)
+BLOCKED = "Save or discard your other changes first: adding comps saves the workbook."
+
+
+def blank(value) -> bool:
+    if isinstance(value, str):
+        return not value.strip()
+    return value is None or bool(pd.isna(value))
+
+
+def comp_fields(columns, kind, price, floor, lot, house_type, condition, note, subdivision,
+                link=None, listed=None) -> dict:
+    """A comp row for the Comps sheet. A pasalo is recorded as a resale at its full
+    price, with a note saying so."""
+    listed = "" if blank(listed) else str(listed).strip()
+    row = {"deal_id": deal_id,
+           "subdivision": None if blank(subdivision) else str(subdivision).strip(),
+           "link": None if blank(link) else str(link).strip(),
+           "type": None if blank(house_type) else str(house_type).strip(),
+           "floor_area_sqm": float(floor), "lot_area_sqm": None if blank(lot) else float(lot),
+           "price": round(float(price)),
+           "condition": "; ".join(p for p in ["" if blank(condition) else str(condition).strip(),
+                                               note] if p) or None,
+           "date_seen": date.today(), "kind": "resale" if kind == "pasalo" else kind,
+           "date_listed": date.fromisoformat(listed) if ISO_DATE.match(listed) else listed or None}
+    return {column: value for column, value in row.items() if column in columns}
+
+
+def find_online() -> None:
+    """One-click searches, opened in your own browser (flip.find_comps)."""
+    default = " ".join(p for p in [house_now.get("subdivision"), house_now.get("city")] if p)
+    query = st.text_input("Search for", value=default, key=key("search"),
+                          help="The subdivision and city work best. Add a model name or "
+                               "'townhouse' to narrow it.")
+    if not query.strip():
+        st.caption("Add the subdivision and city on the House tab, or type what to look for.")
+        return
+    st.caption("Each search opens in a new tab of your own browser, where you're logged in, "
+               "so nothing is blocked. Copy the posts you find into Paste listings below.")
+    links = st.container(horizontal=True)
+    for label, url in search_links(query):
+        links.link_button(label, url, icon=":material/open_in_new:")
+
+
+@st.cache_data(show_spinner=False)
+def market_listings(listings: str, modified: float) -> pd.DataFrame:
+    return clean(load_listings(listings))
+
+
+def draft_from_market(columns, blocked: bool) -> list[dict]:
+    """The drafted comps you ticked, once you press Add; otherwise []."""
+    listings = Path(st.session_state.get("listings_path") or DEFAULT_LISTINGS)
+    if not listings.exists():
+        st.caption(f"No market data at `{listings}`.")
+        return []
+    if not house_now.get("city"):
+        st.caption("Add the house's city on the House tab first: drafts come from listings in "
+                   "the same city.")
+        return []
+    drafts = new_drafts(market_listings(str(listings), listings.stat().st_mtime), house_now,
+                        [c.get("link") for c in now["comps"]])
+    if drafts.empty:
+        st.caption("No similar listings in the market data for this house yet.")
+        return []
+    st.caption("The most similar listings in the market data: same city, floor area within "
+               "25%, same type group, closest places first. Untick any that don't fit; the "
+               "rest are added marked DRAFT, to check before relying on them.")
+    table = pd.DataFrame({
+        "add": True, "kind": drafts["kind"], "match": drafts["match"],
+        "subdivision": drafts["subdivision"], "type": drafts["type"],
+        "floor_area_sqm": drafts["floor_area_sqm"], "price": drafts["price"],
+        "price_per_sqm": drafts["price"] / drafts["floor_area_sqm"], "link": drafts["link"]})
+    edited = st.data_editor(
+        table, hide_index=True, width="stretch", key=key("drafts"),
+        disabled=[c for c in table.columns if c != "add"],
+        column_config={
+            "add": st.column_config.CheckboxColumn("Add"), "kind": "Kind", "match": "Match",
+            "subdivision": "Subdivision", "type": "Type",
+            "floor_area_sqm": st.column_config.NumberColumn("Floor sqm", format="%.2f"),
+            "price": st.column_config.NumberColumn("Price (PHP)", format="localized"),
+            "price_per_sqm": st.column_config.NumberColumn("Per sqm", format="localized"),
+            "link": "Link"})
+    chosen = drafts[edited["add"].fillna(False).astype(bool).to_numpy()]
+    if blocked:
+        st.caption(BLOCKED)
+    label = f"Add {len(chosen)} drafted comp" + ("s" if len(chosen) != 1 else "")
+    if not st.button(label, key=key("drafts_add"), disabled=blocked or chosen.empty,
+                     icon=":material/add:"):
+        return []
+    return [{c: v for c, v in comp_row(deal_id, comp).items() if c in columns}
+            for _, comp in chosen.iterrows()]
 
 
 def pasalo_price(found: dict) -> tuple[float | None, str]:
@@ -238,13 +339,15 @@ def pasalo_price(found: dict) -> tuple[float | None, str]:
     a, b, c = st.columns(3)
     rate = a.number_input("Interest (% a year)", min_value=0.0, max_value=100.0, step=0.5,
                           format="%.2f", key=key("p_rate"),
-                          value=None if found["annual_rate"] is None else found["annual_rate"] * 100)
+                          value=None if found["annual_rate"] is None
+                          else found["annual_rate"] * 100)
     started, term = found["payments_started"], found["term_months"]
     left = b.number_input(
         "Payments left", min_value=0, step=1, key=key("p_left"),
         value=payments_left(started, term, date.today()) if started and term else None,
         help=(f"From the post: payments started {started:%B %d, %Y}, {term} months in all. "
-              if started and term else "") + "The lender's statement of account has the real number.")
+              if started and term else "")
+        + "The lender's statement of account has the real number.")
     implied = (loan_balance(monthly, rate / 100, int(left))
                if None not in (monthly, rate, left) else None)
     c.metric("Balance the loan terms imply", peso(implied),
@@ -269,18 +372,15 @@ def pasalo_price(found: dict) -> tuple[float | None, str]:
     return choice[0], f"pasalo: cash-out + {choice[1]}, unconfirmed"
 
 
-def paste_a_listing(columns, blocked: bool) -> dict | None:
-    """The comp read from a pasted listing, once you press Add; otherwise None."""
-    text = st.text_area("Listing text", key=key("paste"), height=160,
-                        placeholder="Paste the whole post here")
-    st.caption("The app suggests the kind and fills in the numbers it finds: check each one. "
-               "Only the fields below are saved, never the pasted text (it can hold names, "
-               "phone numbers, and exact addresses).")
-    if not text.strip():
-        return None
+def signs_text(found: dict) -> str:
+    return "; ".join(f"{kind}: " + ", ".join(f'"{p}"' for p in phrases)
+                     for kind, phrases in found["signs"].items())
+
+
+def one_post(text: str, columns, blocked: bool) -> tuple[list[dict], list[dict]]:
+    """One pasted post: a full form, with the pasalo calculator."""
     found = read_listing(text)
-    signs = "; ".join(f"{kind}: " + ", ".join(f'"{p}"' for p in phrases)
-                      for kind, phrases in found["signs"].items())
+    signs = signs_text(found)
     if found["kind"]:
         st.info(f"Looks like **{found['kind']}**. Signs found: {signs}", icon=":material/search:")
     else:
@@ -307,34 +407,129 @@ def paste_a_listing(columns, blocked: bool) -> dict | None:
 
     if kind == "pasalo":
         price, note = pasalo_price(found)
-        recorded = "resale"  # recorded at its full price, so it counts like a resale
     else:
         price = st.number_input("Price (PHP)", min_value=0.0, step=10_000.0, format="%.0f",
                                 value=found["price"], key=key("p_price"))
-        note, recorded = "", kind
+        note = ""
     missing = [name for name, value in [("the price", price), ("the floor area", floor)]
                if not value]
     if missing:
         st.caption(f"Still needed: {' and '.join(missing)} (ask the seller). A comp is "
                    "compared per sqm.")
     if blocked:
-        st.caption("Save or discard your other changes first: adding a comp saves the workbook.")
+        st.caption(BLOCKED)
     if not st.button("Add as a comp", key=key("p_add"), disabled=blocked or bool(missing),
                      icon=":material/add:"):
-        return None
-    listed = listed.strip()
-    row = {"deal_id": deal_id, "subdivision": subdivision.strip() or None,
-           "link": link.strip() or None, "type": house_type.strip() or None,
-           "floor_area_sqm": floor, "lot_area_sqm": lot, "price": round(price),
-           "condition": "; ".join(p for p in [condition.strip(), note] if p) or None,
-           "date_seen": date.today(), "kind": recorded,
-           "date_listed": date.fromisoformat(listed) if ISO_DATE.match(listed) else listed or None}
-    return {column: value for column, value in row.items() if column in columns}
+        return [], []
+    row = comp_fields(columns, kind, price, floor, lot, house_type, condition, note, subdivision,
+                      link, listed)
+    return [row], [entry(deal_id, found, suggested_comp(found), kind, row)]
 
+
+def several_posts(posts: list[str], columns, blocked: bool) -> tuple[list[dict], list[dict]]:
+    """Several pasted posts: one row each, to check and tick."""
+    founds = [read_listing(post) for post in posts]
+    suggestions = [suggested_comp(found) for found in founds]
+    st.info(f"{len(posts)} posts. Check each row: tick the ones to add, fix any number, and "
+            "pick the kind where the reader wasn't sure. A pasalo's price is its full price "
+            "(cash-out + the seller's balance); paste it alone to check that balance against "
+            "the loan terms.", icon=":material/table_rows:")
+    table = pd.DataFrame([{
+        "add": all(not blank(s[c]) for c in ["kind", "price", "floor_area_sqm"]),
+        "post": next(line for line in post.splitlines() if line.strip())[:60],
+        "kind": s["kind"] or None, "signs": signs_text(found),
+        "price": s["price"], "floor_area_sqm": s["floor_area_sqm"],
+        "lot_area_sqm": s["lot_area_sqm"], "type": s["type"] or house_now.get("type"),
+        "condition": s["condition"], "subdivision": house_now.get("subdivision"), "link": None,
+    } for post, found, s in zip(posts, founds, suggestions)])
+    edited = st.data_editor(
+        table, hide_index=True, width="stretch", key=key("batch"), disabled=["post", "signs"],
+        column_config={
+            "add": st.column_config.CheckboxColumn("Add"),
+            "post": st.column_config.TextColumn("Post starts with"),
+            "kind": st.column_config.SelectboxColumn("Kind", options=KINDS),
+            "signs": st.column_config.TextColumn("Signs found"),
+            "price": st.column_config.NumberColumn("Price (PHP)", min_value=0.0,
+                                                   format="localized"),
+            "floor_area_sqm": st.column_config.NumberColumn("Floor sqm", min_value=0.0,
+                                                            format="%.2f"),
+            "lot_area_sqm": st.column_config.NumberColumn("Lot sqm", min_value=0.0, format="%.2f"),
+            "type": st.column_config.TextColumn("Type"),
+            "condition": st.column_config.TextColumn("Condition"),
+            "subdivision": st.column_config.TextColumn("Subdivision"),
+            "link": st.column_config.TextColumn("Link"),
+        })
+    ticked = [i for i in edited.index if bool(edited.at[i, "add"])]
+    needed = {"kind": "kind", "price": "price", "floor_area_sqm": "floor area"}
+    problems = [f"post {i + 1} needs its " + " and ".join(name for column, name in needed.items()
+                                                         if blank(edited.at[i, column]))
+                for i in ticked if any(blank(edited.at[i, c]) for c in needed)]
+    if problems:
+        st.caption("Before adding: " + "; ".join(problems) + ".")
+    if blocked:
+        st.caption(BLOCKED)
+    label = f"Add {len(ticked)} comp" + ("s" if len(ticked) != 1 else "")
+    if not st.button(label, key=key("batch_add"), disabled=blocked or not ticked or bool(problems),
+                     icon=":material/add:"):
+        return [], []
+    rows, entries = [], []
+    for i in ticked:
+        r, kind = edited.loc[i], edited.at[i, "kind"]
+        row = comp_fields(columns, kind, r["price"], r["floor_area_sqm"], r["lot_area_sqm"],
+                          r["type"], r["condition"],
+                          suggestions[i]["note"] if kind == "pasalo" else "", r["subdivision"],
+                          r["link"])
+        rows.append(row)
+        entries.append(entry(deal_id, founds[i], suggestions[i], kind, row))
+    return rows, entries
+
+
+def paste_listings(columns, blocked: bool) -> tuple[list[dict], list[dict]]:
+    """Comps read from pasted posts once you press Add, with their score rows."""
+    text = st.text_area("Listing text", key=key("paste"), height=160,
+                        placeholder="Paste a whole post here. Several posts? Put a line with "
+                                    "--- between them.")
+    st.caption("The app suggests the kind and fills in the numbers it finds: check each one. "
+               "Only the fields below are saved, never the pasted text (it can hold names, "
+               "phone numbers, and exact addresses).")
+    scores = reader_scores(LOG)
+    if scores:
+        st.caption("How the reader has done so far: " + " · ".join(scores) + ".")
+    posts = split_posts(text)
+    if not posts:
+        return [], []
+    if len(posts) == 1:
+        return one_post(posts[0], columns, blocked)
+    return several_posts(posts, columns, blocked)
+
+
+def added(n: int, what: str = "comp") -> str:
+    return f"{what} added" if n == 1 else f"{n} {what}s added"
+
+
+if "checklist" in now and not before["checklist"] and not now["checklist"]:
+    with tabs[1 + [t for t, _, _ in TABLES].index("checklist")]:
+        st.caption("No checklist for this house yet.")
+        if bool(changed):
+            st.caption("Save or discard your other changes first: this saves the workbook.")
+        if st.button(f"Add the {len(STANDARD_CHECKLIST)} standard items", key=key("checklist_add"),
+                     disabled=bool(changed), icon=":material/checklist:"):
+            save_and_reload(None, {SHEETS["checklist"]: [
+                {"deal_id": deal_id, "item": item, "status": "open"} for item in STANDARD_CHECKLIST]},
+                "checklist added")
 
 if "comps" in now:
+    columns, blocked = list(inputs.comps.columns), bool(changed)
     with tabs[1 + [t for t, _, _ in TABLES].index("comps")]:
-        with st.expander("Paste a listing (Facebook, Lamudi...)", icon=":material/content_paste:"):
-            comp = paste_a_listing(list(inputs.comps.columns), blocked=bool(changed))
-        if comp:
-            save_and_reload(None, {SHEETS["comps"]: now["comps"] + [comp]}, "comp added")
+        with st.expander("Find comps online", icon=":material/travel_explore:"):
+            find_online()
+        with st.expander("Draft from the market data", icon=":material/table_view:"):
+            drafted = draft_from_market(columns, blocked)
+        with st.expander("Paste listings (Facebook, Lamudi...)", icon=":material/content_paste:"):
+            pasted, scored = paste_listings(columns, blocked)
+    if drafted:
+        save_and_reload(None, {SHEETS["comps"]: now["comps"] + drafted},
+                        added(len(drafted), "drafted comp"))
+    if pasted:
+        save_and_reload(None, {SHEETS["comps"]: now["comps"] + pasted}, added(len(pasted)),
+                        after=lambda: log_entries(LOG, scored))

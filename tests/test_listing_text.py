@@ -9,7 +9,8 @@ from datetime import date
 
 import pytest
 
-from flip.listing_text import classify, loan_balance, money, payments_left, read_listing
+from flip.listing_text import (PASALO_NOTE, classify, loan_balance, money, payments_left,
+                               read_listing, split_posts, suggested_comp)
 
 DEVELOPER = """JADE RESIDENCES RE-OPEN UNITS!
 Malagasang, Imus City, Cavite
@@ -124,3 +125,21 @@ def test_loan_balance():
     # 1.02^81 = 4.972948, so (1 - 1/4.972948) / 0.02 = 39.9456; x 17,000 = 679,075
     assert loan_balance(17_000, 0.24, 81) == pytest.approx(679_075, abs=2)
     assert loan_balance(17_000, 0.24, 0) == 0
+
+
+def test_split_posts():
+    posts = split_posts(f"{RESALE}\n---\n{PASALO}\n\n=====\n{DEVELOPER}\n---\n")
+
+    assert len(posts) == 3
+    assert posts[0].startswith("•Address") and posts[2].startswith("JADE RESIDENCES")
+    assert split_posts("   \n---\n ") == []
+
+
+def test_suggested_comp():
+    pasalo = suggested_comp(read_listing(PASALO))
+    # The cautious full price: 1,100,000 cash-out + 400,000 seller's balance
+    assert (pasalo["kind"], pasalo["price"], pasalo["floor_area_sqm"]) == ("pasalo", 1_500_000, 50)
+    assert pasalo["note"] == PASALO_NOTE
+    resale = suggested_comp(read_listing(RESALE))
+    assert (resale["kind"], resale["price"], resale["note"]) == ("resale", 2_500_000, "")
+    assert suggested_comp(read_listing("Pasalo! Cash out 300k"))["price"] is None  # no balance

@@ -20,12 +20,15 @@ How comps are picked:
 
 import argparse
 import sys
+from datetime import date
 
 import pandas as pd
-from openpyxl import load_workbook
 
+from flip.editing import ISO_DATE, from_editor, to_editor
+from flip.inputs import InputError, load_excel_inputs
 from flip.market import AREA_TOLERANCE, clean, load_listings, type_group
 from flip.pagibig import PROPERTY_NUMBER
+from flip.workbook import WorkbookBusy, save_house
 
 LIMITS = {"resale": 5, "new": 2, "foreclosed": 2}
 TIERS = {1: "same subdivision", 2: "same barangay", 3: "same city"}
@@ -80,55 +83,59 @@ def pick_comps(listings: pd.DataFrame, house: dict) -> pd.DataFrame:
     return result.reset_index(drop=True)
 
 
+def comp_row(deal_id, comp) -> dict:
+    """A picked listing (from pick_comps) as a row for the Comps sheet, marked
+    DRAFT so it is checked before anyone relies on it."""
+    listed = comp.get("date_listed")
+    if isinstance(listed, str) and ISO_DATE.match(listed.strip()):
+        listed = date.fromisoformat(listed.strip())
+    elif not _text(listed):
+        listed = None
+    return {
+        "deal_id": deal_id,
+        "subdivision": ", ".join(str(v) for v in [comp.get("subdivision"),
+                                                   comp.get("barangay")] if _text(v)),
+        "link": comp["link"],
+        "type": comp.get("type") if _text(comp.get("type")) else None,
+        "floor_area_sqm": comp["floor_area_sqm"],
+        "lot_area_sqm": None if pd.isna(comp.get("lot_area_sqm")) else comp.get("lot_area_sqm"),
+        "price": comp["price"],
+        "condition": f"DRAFT from market scan ({comp['match']}): check condition, "
+                     "location, and price before relying on it",
+        "kind": comp["kind"],
+        "date_listed": listed,
+    }
+
+
+def new_drafts(listings: pd.DataFrame, house: dict, existing_links) -> pd.DataFrame:
+    """pick_comps(), without listings already among the house's comps (same link)."""
+    picked = pick_comps(listings, house)
+    already = {_text(link) for link in existing_links if _text(link)}
+    return picked[~picked["link"].map(_text).isin(already)].reset_index(drop=True)
+
+
 def draft_comps(workbook_path, deal_id, listings_path) -> pd.DataFrame:
-    """Add drafted comps for one house to the workbook's Comps sheet.
+    """Add drafted comps for one house to the workbook's Comps sheet, saved
+    through flip.workbook (checked, backed up, never while Excel has it open).
 
     Comps already on the sheet for this house (same link) are not repeated.
     Returns the comps added.
     """
-    wb = load_workbook(workbook_path)
-    props = wb["Properties"]
-    headers = [c.value for c in props[1]]
-    house = None
-    for row in props.iter_rows(min_row=2, values_only=True):
-        if row and row[0] == deal_id:
-            house = dict(zip(headers, row))
-            break
-    if house is None:
+    inputs = load_excel_inputs(workbook_path)
+    houses = inputs.properties[inputs.properties["deal_id"] == deal_id]
+    if houses.empty:
         raise ValueError(f"{deal_id} is not on the Properties sheet")
-    if not house.get("city"):
+    house = houses.iloc[0].to_dict()
+    if not _text(house.get("city")):
         raise ValueError(f"{deal_id} has no city on the Properties sheet; add city (and "
                          "barangay, subdivision, type if you know them) so comps can be matched")
 
-    comps = pick_comps(clean(load_listings(listings_path)), house)
-
-    sheet = wb["Comps"]
-    columns = {c.value: c.column for c in sheet[1] if c.value}
-    already = {str(r[columns["link"] - 1].value) for r in sheet.iter_rows(min_row=2)
-               if r[0].value == deal_id}
-    comps = comps[~comps["link"].astype(str).isin(already)]
-    row = max((c.row for c in sheet["A"] if c.value is not None), default=1) + 1
-    for _, comp in comps.iterrows():
-        values = {
-            "deal_id": deal_id,
-            "subdivision": ", ".join(str(v) for v in [comp.get("subdivision"),
-                                                       comp.get("barangay")] if _text(v)),
-            "link": comp["link"],
-            "type": comp.get("type") if _text(comp.get("type")) else None,
-            "floor_area_sqm": comp["floor_area_sqm"],
-            "lot_area_sqm": comp.get("lot_area_sqm") if not pd.isna(comp.get("lot_area_sqm"))
-            else None,
-            "price": comp["price"],
-            "condition": f"DRAFT from market scan ({comp['match']}): check condition, "
-                         "location, and price before relying on it",
-            "kind": comp["kind"],
-            "date_listed": comp.get("date_listed") if _text(comp.get("date_listed")) else None,
-        }
-        for name, value in values.items():
-            if name in columns:
-                sheet.cell(row=row, column=columns[name]).value = value
-        row += 1
-    wb.save(workbook_path)
+    current = from_editor(to_editor(inputs.comps, deal_id), deal_id)
+    comps = new_drafts(clean(load_listings(listings_path)), house,
+                       [c.get("link") for c in current])
+    if not comps.empty:
+        save_house(workbook_path, deal_id, tables={
+            "Comps": current + [comp_row(deal_id, c) for _, c in comps.iterrows()]})
     return comps
 
 
@@ -140,9 +147,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
     try:
         added = draft_comps(args.workbook, args.deal_id, args.listings)
-    except PermissionError:
+    except (WorkbookBusy, PermissionError):
         sys.exit(f"Can't write {args.workbook}. If it is open in Excel, close it and run again.")
-    except ValueError as error:
+    except (InputError, ValueError) as error:  # InputError is a ValueError, listed for clarity
         sys.exit(str(error))
     if added.empty:
         print(f"No new comps found for {args.deal_id} in {args.listings}.")

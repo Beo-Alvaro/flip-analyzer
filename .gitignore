@@ -20,3 +20,6 @@ data/market/*.json
 # Generated reports (Excel export lands here)
 output/
 ~$*.xlsx
+
+# How well the listing reader guesses (made by the web app; no listing text)
+data/paste_log.csv
