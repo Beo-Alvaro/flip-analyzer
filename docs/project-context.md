@@ -108,6 +108,18 @@ unsaved change forever and blocked adding comps); an "Add the 8 standard
 items" button saves them instead.
 Collector verified by the user 2026-10-18: 1,538 properties, 1,482 houses
 (477 unoccupied), every row with its offer closing date.
+Jade (IMUS-02) lessons, fixed 2026-10-18: (1) the Start-a-deal hint showed
+the city's new-unit median (66,667/sqm, P2,833,333 for 42.5 sqm) and it was
+typed in as the ARV; the form now shows a visible ARV guide built from new
+compare_foreclosures columns subdivision_{resale,new}_{listings,per_sqm}
+(similar size and type, even 1 listing), city figure labeled a maximum.
+(2) A house with no loan offers silently got 70% at 9%: Start a deal now
+adds a Cash offer (tick box), and Analyze shows a note on default terms
+(text built from analyze()'s defaults). (3) pagibig.remove_unlisted drops
+earlier OPA rows no longer listed, only for cities in the new file.
+Jade verdict with a bare-shell estimate (P313,000, 11 items marked
+estimate): fails (profit 23,311 on loan / 87,554 cash); passes only if the
+unit needs about P100,000 or less. Decision rests on the unit's condition.
 
 ## Market scan (flip.market)
 data/market/cavite_listings.csv: ~340 public listings collected

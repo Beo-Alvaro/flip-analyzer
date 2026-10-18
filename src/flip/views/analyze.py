@@ -19,8 +19,9 @@ from flip.decision import add_verdicts, checklist_status, sensitivity
 from flip.export import export_inputs
 from flip.inputs import SAMPLE_BANNER, InputError, load_excel_inputs
 from flip.scenarios import run_scenarios
-from flip.tables import build_deals
-from flip.ui import load_inputs, pct, peso, pick_house, uploaded_workbook, workbook_path
+from flip.tables import DEFAULT_TERMS, build_deals
+from flip.ui import (DEFAULT_LOAN, load_inputs, pct, peso, pick_house, uploaded_workbook,
+                     workbook_path)
 
 # --- Where the deals come from (chosen in the sidebar) ---
 
@@ -123,6 +124,9 @@ analyzed = add_verdicts(analyze_deals(deals[deals["deal_id"] == deal_id], settin
                         settings, inputs.checklist)
 offer = st.radio("Loan offer", list(analyzed["offer"]), horizontal=True, key=f"offer_{deal_id}")
 o = analyzed[analyzed["offer"] == offer].iloc[0]
+if offer == DEFAULT_TERMS:
+    st.info(f"No loan offers entered for this house, so this assumes {DEFAULT_LOAN}. Add your "
+            "real offers, or a Cash row, on Edit a house.", icon=":material/info:")
 
 verdict, _, checklist_note = o["verdict"].partition(" | ")
 if verdict.startswith("Meets"):

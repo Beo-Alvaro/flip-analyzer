@@ -42,6 +42,16 @@ def test_add_deal(workbook):
     assert list(load_excel_inputs(saved).properties["deal_id"]) == ["SAMPLE-01"]
 
 
+def test_add_deal_with_a_cash_offer(workbook):
+    cash = {"offer": "Cash", "loan_ratio": 0, "annual_interest_rate": 0, "loan_fee_rate": 0}
+    add_deal(workbook, HOUSE, loan_offers=[cash])
+
+    offers = load_excel_inputs(workbook).loan_offers
+    mine = offers[offers["deal_id"] == "TANZA-01"]
+    assert list(mine["offer"]) == ["Cash"]
+    assert len(offers[offers["deal_id"] == "SAMPLE-01"]) == 3  # the example's offers untouched
+
+
 def test_column_notes_and_typing_checks_are_kept(workbook):
     add_deal(workbook, HOUSE)
 

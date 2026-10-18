@@ -18,7 +18,9 @@ Every house in the province (default Cavite) is added to
 data/market/cavite_listings.csv as a foreclosed listing with its price,
 floor and lot area, and whether it is occupied. Lots, condos, and parking
 slots are skipped. A property already in the file (same Pag-IBIG property
-number) is replaced by the new row.
+number) is replaced by the new row. After a collector import, earlier
+auction rows for the same cities that are no longer listed (sold or
+withdrawn) are removed.
 """
 
 import argparse
@@ -116,6 +118,7 @@ def parse_row(cells: list) -> dict | None:
     }
 
 
+OPA_SOURCE = "pagibigfundservices.com Online Public Auction"
 OPA_SALES = {"1st auction": "minimum bid (1st auction)",
              "2nd auction": "minimum bid (2nd auction)",
              "negotiated sale": "selling price (negotiated sale)"}
@@ -170,7 +173,7 @@ def parse_opa_card(card: dict) -> dict | None:
         "date_listed": listed,
         "notes": f"{sale}; batch {card.get('batch', '')}; offers {card.get('dates', '')}".strip(),
         "link": f"pagibig:{card['id']}",
-        "source": "pagibigfundservices.com Online Public Auction",
+        "source": OPA_SOURCE,
         "collected": date.today().isoformat(),
     }
 
@@ -241,11 +244,37 @@ def merge_into(listings_path, imported: pd.DataFrame) -> tuple[int, int]:
     replaced = int((~keep).sum()) if not existing.empty else 0
     merged = pd.concat([existing[keep] if not existing.empty else existing, imported],
                        ignore_index=True)
+    _write(path, notes, merged)
+    return len(imported) - replaced, replaced
+
+
+def remove_unlisted(listings_path, imported: pd.DataFrame) -> int:
+    """After importing a full Online Public Auction collection: remove earlier
+    auction rows that are no longer listed (sold or withdrawn). Returns how
+    many were removed.
+
+    Only cities in the new collection are cleaned, so a collector run that
+    stopped early can't wipe out the cities it never reached. Other sources'
+    rows are never removed.
+    """
+    path = Path(listings_path)
+    if imported.empty or not path.exists():
+        return 0
+    notes, existing = file_notes(path), load_deals(path)
+    if existing.empty or "source" not in existing:
+        return 0
+    gone = ((existing["source"] == OPA_SOURCE) & existing["city"].isin(set(imported["city"]))
+            & ~existing["link"].isin(set(imported["link"])))
+    if gone.any():
+        _write(path, notes, existing[~gone])
+    return int(gone.sum())
+
+
+def _write(path: Path, notes: list[str], listings: pd.DataFrame) -> None:
     with path.open("w", encoding="utf-8", newline="") as f:
         if notes:
             f.write("\n".join(notes) + "\n")
-        merged.to_csv(f, index=False)
-    return len(imported) - replaced, replaced
+        listings.to_csv(f, index=False)
 
 
 if __name__ == "__main__":
@@ -267,6 +296,8 @@ if __name__ == "__main__":
     if imported.empty:
         sys.exit(f"No houses found in {args.file}. Is it a Pag-IBIG listing file?")
     added, replaced = merge_into(args.into, imported)
+    removed = remove_unlisted(args.into, imported) if args.file.lower().endswith(".json") else 0
     occupied = int((imported["occupancy"] == "occupied").sum())
     print(f"{label}: {len(imported)} houses ({occupied} occupied, "
-          f"{len(imported) - occupied} not). {added} new, {replaced} replaced in {args.into}")
+          f"{len(imported) - occupied} not). {added} new, {replaced} replaced in {args.into}"
+          + (f"; {removed} no longer listed, removed" if removed else ""))

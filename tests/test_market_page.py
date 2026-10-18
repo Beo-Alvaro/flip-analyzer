@@ -104,15 +104,36 @@ def test_start_a_deal(app, files):
     assert house["description"] == "Sunrise Homes townhouse, Pag-IBIG 1st auction, unoccupied"
     checklist = inputs.checklist[inputs.checklist["deal_id"] == "TANZA-01"]
     assert list(checklist["item"]) == STANDARD_CHECKLIST
+    offers = inputs.loan_offers[inputs.loan_offers["deal_id"] == "TANZA-01"]
+    assert list(offers["offer"]) == ["Cash"]  # so no loan is assumed
+    assert offers[["loan_ratio", "annual_interest_rate", "loan_fee_rate"]].sum().sum() == 0
     assert len(list((files["workbook"].parent / "backups").iterdir())) == 1
 
 
-def test_the_new_deal_is_analyzed(app):
+def test_the_new_deal_is_analyzed_as_cash(app):
     start(app)
     app.switch_page("views/analyze.py").run()
     app.selectbox(key="house").set_value("TANZA-01").run()
 
-    # No loan offers, so the default terms: 70% loan at 9% a year, 1% fee.
+    # Cash: no interest, no loan fee. Acquisition 25,000; holding 30,000; selling 135,000.
+    # Total cost 1,000,000 + 25,000 + 30,000 + 135,000 = 1,190,000 -> profit 310,000.
+    # Cash invested: 1,000,000 + 25,000 + 30,000 = 1,055,000.
+    metrics = {m.label: m.value for m in app.metric}
+    assert metrics["Net profit"] == "₱310,000"
+    assert metrics["ROI on total cost"] == "26.05%"  # 310,000 / 1,190,000
+    assert metrics["Cash-on-cash ROI"] == "29.38%"  # 310,000 / 1,055,000
+    assert not any("No loan offers entered" in i.value for i in app.info)
+
+
+def test_the_new_deal_without_cash_uses_default_terms(app):
+    app.checkbox(key="cash_pagibig:815200000000001").uncheck()
+    start(app)
+    app.switch_page("views/analyze.py").run()
+    app.selectbox(key="house").set_value("TANZA-01").run()
+
+    assert any("No loan offers entered for this house, so this assumes a 70% loan at 9% a "
+               "year with a 1% fee" in i.value for i in app.info)
+    # The default terms: 70% loan at 9% a year, 1% fee.
     # Acquisition 2.5% x 1,000,000 = 25,000; interest 700,000 x 9% x 6/12 = 31,500;
     # loan fee 7,000; holding 6 x 5,000 = 30,000; selling (3% + 6%) x 1,500,000 = 135,000.
     # Total cost 1,228,500 -> net profit 1,500,000 - 1,228,500 = 271,500.
@@ -121,6 +142,14 @@ def test_the_new_deal_is_analyzed(app):
     assert metrics["Net profit"] == "₱271,500"
     assert metrics["ROI on total cost"] == "22.10%"  # 271,500 / 1,228,500
     assert metrics["Cash-on-cash ROI"] == "69.00%"  # 271,500 / 393,500
+
+
+def test_arv_guide(app):
+    # Sunrise Homes new units: 50,000 and 52,000 per sqm -> median 51,000 x 40 sqm
+    guide = next(c.value for c in app.caption if c.value.startswith("**ARV guide**"))
+    assert ("**New units in Sunrise Homes** (2 listings of a similar size): ₱51,000 per sqm, "
+            "about **₱2,040,000** for this size. That's a ceiling") in guide
+    assert "elsewhere in the city" not in guide  # compared within its own subdivision
 
 
 def test_arv_and_monthly_cost_are_required(app, files):

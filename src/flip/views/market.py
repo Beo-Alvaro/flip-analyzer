@@ -15,13 +15,14 @@ import streamlit as st
 
 from flip.inputs import InputError, load_excel_inputs
 from flip.market import LITTLE_ROOM, LOOK, NO_FAIR, scan, workbook_comps
-from flip.pagibig import import_opa, merge_into
+from flip.pagibig import import_opa, merge_into, remove_unlisted
 from flip.template import STANDARD_CHECKLIST
-from flip.ui import DEFAULT_LISTINGS, peso, uploaded_workbook, workbook_path
+from flip.ui import DEFAULT_LISTINGS, DEFAULT_LOAN, peso, uploaded_workbook, workbook_path
 from flip.workbook import WorkbookBusy, add_deal, backup, check_not_open, next_deal_id
 
 COLLECTOR = Path(__file__).resolve().parents[3] / "docs" / "pagibig-opa-collector.js"
 SHORT = {LOOK: "Worth a closer look", LITTLE_ROOM: "Little room", NO_FAIR: "No fair comparison"}
+CASH_OFFER = {"offer": "Cash", "loan_ratio": 0.0, "annual_interest_rate": 0.0, "loan_fee_rate": 0.0}
 
 
 @st.cache_data(show_spinner="Screening every foreclosure...")
@@ -42,18 +43,34 @@ def label(house) -> str:
             f"{text(house['occupancy']) or 'occupancy unknown'} · {SHORT[house['screen']]}")
 
 
-def arv_hint(house) -> str:
-    """What the scan compared the house with, as a starting point for the ARV."""
+def listings(n) -> str:
+    return f"{int(n)} listing" + ("s" if int(n) != 1 else "")
+
+
+def arv_guide(house) -> list[str]:
+    """What the house's price could be compared with, closest first: resale and
+    new units of a similar size in its own subdivision, then the city's median
+    (for new units only a maximum: they are often in pricier subdivisions)."""
+    area, place = house["floor_area_sqm"], text(house["subdivision"]) or "this subdivision"
+    lines = []
+    for kind, words in [("resale", "the best guide, though asking prices run a little high"),
+                        ("new", "a ceiling: a renovated used unit usually sells for less")]:
+        n, per_sqm = house.get(f"subdivision_{kind}_listings"), house.get(f"subdivision_{kind}_per_sqm")
+        if n and not pd.isna(per_sqm):
+            name = "Resale" if kind == "resale" else "New units"
+            lines.append(f"**{name} in {place}** ({listings(n)} of a similar size): "
+                         f"{peso(per_sqm)} per sqm, about **{peso(per_sqm * area)}** for this "
+                         f"size. That's {words}.")
     benchmark, per_sqm = text(house["benchmark"]), house["benchmark_per_sqm"]
-    if pd.isna(per_sqm):
-        return "No comparison yet: collect resale comps from its subdivision."
-    size = per_sqm * house["floor_area_sqm"]
-    if "resale" in benchmark:
-        return (f"Resale comparison ({benchmark}): {peso(per_sqm)} per sqm, about {peso(size)} "
-                "for this size.")
-    return (f"New units ({benchmark}) cost about {peso(per_sqm)} per sqm, {peso(size)} for "
-            "this size. That is a ceiling, not an ARV: a renovated resale usually sells "
-            "for less.")
+    if benchmark.startswith("city") and not pd.isna(per_sqm):
+        if "new" in benchmark:
+            lines.append(f"New units elsewhere in the city: {peso(per_sqm)} per sqm (about "
+                         f"{peso(per_sqm * area)}). Only a maximum, since they are often in "
+                         "pricier subdivisions: **don't use it as the ARV**.")
+        else:
+            lines.append(f"Resale elsewhere in the city: {peso(per_sqm)} per sqm (about "
+                         f"{peso(per_sqm * area)}), a rough guide.")
+    return lines or ["No comparison yet: collect resale comps from its subdivision."]
 
 
 st.title("Market scan")
@@ -98,12 +115,15 @@ with st.expander("Refresh Pag-IBIG listings (once a month)", icon=":material/syn
             check_not_open(listings_path)
             saved = backup(listings_path) if listings_path.exists() else None
             added, replaced = merge_into(listings_path, imported)
+            removed = remove_unlisted(listings_path, imported)  # sold or withdrawn since
         except (OSError, ValueError, WorkbookBusy) as error:
             st.error(str(error))
         else:
             vacant = int((imported["occupancy"] == "unoccupied").sum())
             st.success(f"Imported {len(imported)} house{'s' * (len(imported) != 1)} "
                        f"({vacant} unoccupied): {added} new, {replaced} updated."
+                       + (f" {removed} no longer listed (sold or withdrawn) were removed."
+                          if removed else "")
                        + (f" The previous file is backed up at `{saved}`." if saved else ""))
 
 if not listings_path.exists():
@@ -204,6 +224,7 @@ link = text(house["link"])
 sale = re.search(r"\(([^)]+)\)", text(house["price_basis"]))
 st.caption("Fill in what you know now; you can change everything later in the workbook. "
            "The ARV is your first guess: comps check it on the Analyze page.")
+st.caption("**ARV guide**  \n" + "  \n".join(arv_guide(house)))
 with st.form(f"start_{link}"):
     left, right = st.columns(2)
     deal_id = left.text_input("deal_id", value=next_deal_id(taken, house["city"]),
@@ -215,7 +236,9 @@ with st.form(f"start_{link}"):
     price = left.number_input("Purchase price (PHP)", min_value=0.0, step=10_000.0,
                               format="%.0f", value=float(house["price"]), key=f"price_{link}")
     arv = middle.number_input("ARV: sale price after repair (PHP)", min_value=0.0,
-                              step=10_000.0, format="%.0f", value=None, help=arv_hint(house),
+                              step=10_000.0, format="%.0f", value=None,
+                              help="What it should sell for after renovation: see the ARV "
+                                   "guide above.",
                              key=f"arv_{link}")
     monthly = right.number_input(
         "Monthly holding cost (PHP)", min_value=0.0, step=500.0, format="%.0f", value=None,
@@ -233,6 +256,9 @@ with st.form(f"start_{link}"):
                                      key=f"contingency_{link}")
     checklist = st.checkbox(f"Add the {len(STANDARD_CHECKLIST)} standard checklist items "
                             "(title, occupants, dues...)", value=True, key=f"checklist_{link}")
+    cash = st.checkbox("Add a Cash offer (no loan)", value=True, key=f"cash_{link}",
+                       help=f"Without any loan offer, the analysis assumes {DEFAULT_LOAN}. "
+                            "Add your real loan offers on Edit a house.")
     submitted = st.form_submit_button("Add to my workbook", icon=":material/add_home:",
                                       key="add_deal")
 
@@ -252,7 +278,8 @@ if submitted:
         "type": text(house["type"]),
     }
     try:
-        saved = add_deal(path, row, STANDARD_CHECKLIST if checklist else ())
+        saved = add_deal(path, row, STANDARD_CHECKLIST if checklist else (),
+                         [CASH_OFFER] if cash else ())
     except WorkbookBusy as error:
         st.error(str(error))
     except InputError as error:

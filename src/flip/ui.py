@@ -1,15 +1,21 @@
 """Pieces shared by the web app's pages (src/flip/views)."""
 
+import inspect
 import tempfile
 from pathlib import Path
 
 import pandas as pd
 import streamlit as st
 
+from flip.analyzer import analyze
 from flip.inputs import load_excel_inputs
 
 DEFAULT_WORKBOOK = "data/deals_input.xlsx"
 DEFAULT_LISTINGS = "data/market/cavite_listings.csv"
+_TERMS = inspect.signature(analyze).parameters  # what a house with no loan offers gets
+DEFAULT_LOAN = (f"a {_TERMS['loan_ratio'].default:.0%} loan at "
+                f"{_TERMS['annual_interest_rate'].default:.0%} a year with a "
+                f"{_TERMS['loan_fee_rate'].default:.0%} fee")
 
 
 def peso(value) -> str:

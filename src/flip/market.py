@@ -230,6 +230,17 @@ def offer_window(notes) -> tuple[str, str]:
     return window, closes
 
 
+def _subdivision_prices(same: pd.DataFrame) -> tuple[int, float, int, float]:
+    """Resale and new listings of a similar house in the same subdivision: how
+    many, and their median price per sqm. Shown even when there are too few
+    for a benchmark (one developer price is still the best ceiling there is)."""
+    prices = []
+    for kind in ["resale", "new"]:
+        per_sqm = same.loc[same["kind"] == kind, "price_per_sqm"]
+        prices += [len(per_sqm), per_sqm.median() if len(per_sqm) else float("nan")]
+    return tuple(prices)
+
+
 def _screen(benchmark: str, ratio: float) -> str:
     if pd.isna(ratio):
         return NO_FAIR
@@ -266,9 +277,12 @@ def compare_foreclosures(listings: pd.DataFrame, summary: pd.DataFrame) -> pd.Da
         if (city, key, group, area) not in benchmarks:
             same = like_for_like(in_subdivision(others, city, key), area, group)
             city_row = by_city.loc[city] if city in by_city.index else None
-            benchmarks[(city, key, group, area)] = _benchmark(same, city_row)
+            benchmarks[(city, key, group, area)] = (*_benchmark(same, city_row),
+                                                    *_subdivision_prices(same))
         looked_up.append((*benchmarks[(city, key, group, area)], supply[(city, key)]))
     for i, column in enumerate(["benchmark", "benchmark_listings", "benchmark_per_sqm",
+                                "subdivision_resale_listings", "subdivision_resale_per_sqm",
+                                "subdivision_new_listings", "subdivision_new_per_sqm",
                                 "foreclosures_in_subdivision"]):
         foreclosed[column] = [values[i] for values in looked_up]
     foreclosed["vs_benchmark"] = foreclosed["price_per_sqm"] / foreclosed["benchmark_per_sqm"]
@@ -284,6 +298,8 @@ def compare_foreclosures(listings: pd.DataFrame, summary: pd.DataFrame) -> pd.Da
     columns = ["city", "barangay", "subdivision", "type", "price", "price_basis",
                "floor_area_sqm", "price_per_sqm", "benchmark", "benchmark_listings",
                "benchmark_per_sqm", "vs_benchmark", "vs_resale", "screen",
+               "subdivision_resale_listings", "subdivision_resale_per_sqm",
+               "subdivision_new_listings", "subdivision_new_per_sqm",
                "foreclosures_in_subdivision", "occupancy", "date_listed", "offer_window",
                "offer_closes", "link"]
     return (foreclosed.sort_values(["order", "vs_benchmark", "city"])

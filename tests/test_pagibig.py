@@ -3,12 +3,14 @@ real list (NCR branch tranche SPB 321, April 2024), including one scrambled
 by a mirror site's page stamp and one whose address wraps onto two lines.
 """
 
+import json
+
 import pandas as pd
 import pytest
 
 from flip.batch import file_notes, load_deals
 from flip.pagibig import (import_opa, import_rows, list_details, merge_into,
-                          parse_opa_card, parse_row)
+                          parse_opa_card, parse_row, remove_unlisted)
 
 HEADER = ["ITEM\nNO", "PROPERTY NUMBER", "", "TYPE", "TCT/CCT NO.", "LOT\nAREA", "FLOOR\nAREA",
           "MINIMUM BID\nPRICE", "APPRAISAL\nDATE", "REQUIRED GROSS\nMONTHLY INCOME", "REMARKS"]
@@ -184,3 +186,27 @@ def test_import_opa_file(tmp_path):
     path.write_text(json.dumps([BELVEDERE, ELISA_OPA, OPA_LOT]), encoding="utf-8")
 
     assert list(import_opa(path)["link"]) == ["pagibig:815202508290182", "pagibig:815202608280010"]
+
+
+def test_a_full_import_removes_houses_no_longer_listed(tmp_path):
+    path = tmp_path / "listings.csv"
+    source = "pagibigfundservices.com Online Public Auction"
+    path.write_text(
+        "# Test listings\n"
+        "city,kind,price,floor_area_sqm,link,source\n"
+        f"Tanza,foreclosed,480000,35,pagibig:815202508290182,{source}\n"  # still listed
+        f"Tanza,foreclosed,600000,36,pagibig:815200000000001,{source}\n"  # sold since
+        f"Naic,foreclosed,700000,34,pagibig:815200000000002,{source}\n"   # Naic not collected
+        "Tanza,new,2000000,40,https://example.com/new-unit,fazwaz.ph\n",  # another source
+        encoding="utf-8")
+    cards = tmp_path / "opa.json"
+    cards.write_text(json.dumps([BELVEDERE]), encoding="utf-8")  # Tanza only
+    imported = import_opa(cards)
+
+    assert merge_into(path, imported) == (0, 1)  # Belvedere updated
+    assert remove_unlisted(path, imported) == 1  # the sold Tanza house
+    links = list(load_deals(path)["link"])
+    assert "pagibig:815200000000001" not in links
+    assert {"pagibig:815202508290182", "pagibig:815200000000002",
+            "https://example.com/new-unit"} <= set(links)
+    assert file_notes(path) == ["# Test listings"]

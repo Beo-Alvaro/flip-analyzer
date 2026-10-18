@@ -189,6 +189,8 @@ def test_same_subdivision_new_units(compared):
     assert s3["vs_benchmark"] == pytest.approx(25_000 / 51_000)
     assert s3["screen"] == LOOK
     assert s3["foreclosures_in_subdivision"] == 2  # s3 and s4
+    assert (s3["subdivision_new_listings"], s3["subdivision_new_per_sqm"]) == (2, 51_000)
+    assert s3["subdivision_resale_listings"] == 0
 
 
 def test_same_subdivision_resale_comes_before_new(compared):
@@ -204,6 +206,8 @@ def test_one_listing_in_the_subdivision_falls_back_to_the_city(compared):
     o2 = compared.loc["o2"]
     # Tanza resale: 35,000, 40,000, 42,000 -> median 40,000; 22,500 / 40,000 = 56.25%
     assert (o2["benchmark"], o2["benchmark_listings"]) == ("city: resale", 3)
+    # The one Oak Ridge resale is still shown: too few for a benchmark, but the closest price
+    assert (o2["subdivision_resale_listings"], o2["subdivision_resale_per_sqm"]) == (1, 35_000)
     assert o2["benchmark_per_sqm"] == money(40_000)
     assert o2["vs_benchmark"] == pytest.approx(0.5625)
     assert o2["screen"] == LOOK
@@ -248,6 +252,7 @@ def test_same_subdivision_needs_a_similar_house():
     # would have looked like 50%). The city has only 2 new units: no benchmark.
     row = compared.loc["pagibig:815200000000001"]
     assert (row["benchmark"], row["screen"]) == ("none", NO_FAIR)
+    assert row["subdivision_new_listings"] == 0  # the detached new units aren't similar
     assert row["foreclosures_in_subdivision"] == 3  # both rowhouses and g5
     # The 85 sqm detached house is: 80 and 90 are within 25% of 85 (63.75 to 106.25).
     # 2,550,000 / 85 = 30,000; 30,000 / 50,000 = 60%

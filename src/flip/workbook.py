@@ -179,8 +179,9 @@ def save_changes(path, changes) -> Path:
     return saved
 
 
-def add_deal(path, house: dict, checklist_items=()) -> Path:
-    """Add a house to the Properties sheet, plus its checklist items (status open).
+def add_deal(path, house: dict, checklist_items=(), loan_offers=()) -> Path:
+    """Add a house to the Properties sheet, plus its checklist items (status open)
+    and loan offers (each a dict: offer, loan_ratio, annual_interest_rate...).
 
     house: column name -> value, e.g. deal_id, purchase_price, arv... Returns
     the backup's path.
@@ -200,6 +201,8 @@ def add_deal(path, house: dict, checklist_items=()) -> Path:
         if checklist_items and "Checklist" in wb.sheetnames:
             _append(wb["Checklist"], [{"deal_id": deal_id, "item": item, "status": "open"}
                                       for item in checklist_items])
+        if loan_offers:
+            _append(wb["Loan offers"], [{**offer, "deal_id": deal_id} for offer in loan_offers])
 
     return save_changes(path, changes)
 

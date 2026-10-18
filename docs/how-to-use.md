@@ -41,8 +41,11 @@ three results:
 Prefer unoccupied units, and check **Foreclosures for sale in subdivision**:
 when dozens of the same house are for sale from Pag-IBIG, you will resell
 against them. When one looks worth pursuing, press **Start a deal** on the
-page: it adds the house to your workbook (with the standard checklist), and
-you continue with Step 2.
+page: it adds the house to your workbook (with the standard checklist and a
+Cash offer), and you continue with Step 2. For the ARV, read the form's
+**ARV guide**: prices in the house's own subdivision come first. The city's
+new-unit median is only a maximum, because those units are often in pricier
+subdivisions; don't type it in as the ARV.
 
 To keep it current, collect Pag-IBIG's listings once a month: the page's
 **Refresh Pag-IBIG listings** section has the steps, the browser snippet

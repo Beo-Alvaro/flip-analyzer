@@ -24,8 +24,8 @@ from flip.listing_text import (loan_balance, payments_left, read_listing, split_
 from flip.market import clean, load_listings
 from flip.paste_log import entry, log_entries, reader_scores
 from flip.template import STANDARD_CHECKLIST
-from flip.ui import (DEFAULT_LISTINGS, load_inputs, peso, pick_house, uploaded_workbook,
-                     workbook_path)
+from flip.ui import (DEFAULT_LISTINGS, DEFAULT_LOAN, load_inputs, peso, pick_house,
+                     uploaded_workbook, workbook_path)
 from flip.workbook import WorkbookBusy, save_house
 
 TABLES = [  # (table, tab title, what goes in it)
@@ -35,7 +35,7 @@ TABLES = [  # (table, tab title, what goes in it)
      "Up-front costs that aren't renovation: eviction and legal, unpaid dues and taxes."),
     ("loan_offers", "Loan offers",
      "One row per way to pay. Add a row named Cash with 0s to compare paying cash. With no "
-     "rows, the analysis uses a 70% loan at 9% a year with a 1% fee (default terms)."),
+     f"rows, the analysis assumes {DEFAULT_LOAN} (default terms)."),
     ("comps", "Comps",
      "Comparable listings, one per row. Only resale comps set the suggested ARV; new units "
      "are the ceiling, foreclosures the floor, and pasalo prices are left out. Every comp "

@@ -168,7 +168,10 @@ the order of the deal cycle:
   steps are on the page), filter every screened foreclosure (city, screen
   result, unoccupied, offer window still open, how many are for sale in
   the subdivision), and **Start a deal**: the house's price, floor area,
-  and location go into your workbook along with the standard checklist.
+  and location go into your workbook along with the standard checklist and
+  a Cash offer (so no loan is assumed). Its **ARV guide** shows resale and
+  new prices in the house's own subdivision first; the city's new-unit
+  median is labeled as only a maximum.
   The resale and new comps in your workbook count as listings too, so
   every comp you add makes the scan fairer for its whole subdivision.
 - **Edit a house**: its numbers (price, ARV, months, holding cost...) and
@@ -242,10 +245,13 @@ site (it stopped publishing PDF lists). Once a month:
 python -m flip.pagibig data/market/opa_listings.json
 ```
 
-Every house is added with its price, floor and lot area, occupancy, and sale
-type; lots, condos, and parking slots are skipped, and a property already in
-the file is replaced by the new row. Older PDF lists can be imported the same
-way (`python -m flip.pagibig LIST.pdf`). Rebuild the market report afterwards.
+Every house is added with its price, floor and lot area, occupancy, sale
+type, and offer window; lots, condos, and parking slots are skipped, and a
+property already in the file is replaced by the new row. Houses from an
+earlier collection that are no longer listed (sold or withdrawn) are removed,
+but only for cities in the new file, so a run that stopped early can't wipe
+out the rest. Older PDF lists can be imported the same way
+(`python -m flip.pagibig LIST.pdf`). Rebuild the market report afterwards.
 
 ### Draft comps for a house
 
