@@ -118,6 +118,11 @@ pip install -e ".[dev]"
 python -m pytest
 ```
 
+On Windows, PowerShell may refuse `activate` ("running scripts is disabled
+on this system"). You don't need it: run the project's Python directly,
+e.g. `.venv\Scripts\python -m flip.web`, and use `.venv\Scripts\python`
+wherever this README says `python`.
+
 ### Analyze your own deals
 
 1. Create the input workbook:
