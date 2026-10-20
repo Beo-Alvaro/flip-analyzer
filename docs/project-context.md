@@ -120,6 +120,15 @@ earlier OPA rows no longer listed, only for cities in the new file.
 Jade verdict with a bare-shell estimate (P313,000, 11 items marked
 estimate): fails (profit 23,311 on loan / 87,554 cash); passes only if the
 unit needs about P100,000 or less. Decision rests on the unit's condition.
+README rewritten for flippers (2026-10-20): what it does per deal step,
+then a 10-step how-to with screenshots in docs/images/readme/. User chose
+"Jade, anonymized": screenshots taken from a scratch demo workbook holding
+only JADE-01 (no property number, no Facebook link, other deals removed),
+deleted afterwards; never commit the real workbook or its backups. Bugs
+found while taking them: Analyze crashed when every loan offer was a
+whole-number Cash row (tables.build_deals now casts loan columns to
+float); chart labels rounded .5 up while figures rounded to even; price
+per sqm showed 3 decimals.
 
 ## Market scan (flip.market)
 data/market/cavite_listings.csv: ~340 public listings collected
