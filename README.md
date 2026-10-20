@@ -16,11 +16,34 @@ bare-shell renovation estimate and paying cash, it would earn ₱87,554, and
 the most it could cost to survive a bad case is ₱998,182, below the minimum
 bid. Verdict: don't bid, unless the unit turns out to be finished already.*
 
+## Why I built this
+
+In the United States, house flipping is an established business: investors
+buy run-down or foreclosed houses, renovate them, and resell within months.
+A whole industry supports it, including **"hard money" lenders**: private
+lenders and specialized companies that make short-term loans based on a
+property's value, often its value after repair, so a flipper can buy and
+renovate with borrowed money. Flippers there also share rules of thumb, like
+paying at most 70% of the after-repair value, minus the repairs.
+
+In the Philippines, flipping is still small and informal. As far as I could
+find, there is no financing built for it: buyers mostly pay cash or use
+housing loans meant for people who will live in the house. Yet there is no
+shortage of houses: Pag-IBIG auctions thousands of foreclosures, about
+1,500 houses in Cavite alone.
+
+So I wanted to answer one question: **can the flipping model work here,
+with Philippine prices and costs?** That means Philippine taxes (6% capital
+gains tax, about 2.5% transfer costs), Philippine listing habits (pasalo
+posts, asking prices with no public record of sale prices), and Pag-IBIG's
+auction rules. This tool does the screening a flipper would do, and is
+honest about the answer.
+
 ## What it does for a flipper
 
 | Step | What the tool does |
 |---|---|
-| **Find** | Imports every house on Pag-IBIG's [Online Public Auction](https://www.pagibigfundservices.com/OnlinePublicAuction/) (a browser snippet you run once a month: about 1,500 houses for Cavite) and screens each one **like for like**: against resale and new homes of a similar size and type in the **same subdivision** first. Shows how many foreclosures you would be competing with when you resell, and hides offers that have closed. |
+| **Find** | Imports every house on Pag-IBIG's [Online Public Auction](https://www.pagibigfundservices.com/OnlinePublicAuction/) (a browser snippet you run once a month) and screens each one **like for like**: against resale and new homes of a similar size and type in the **same subdivision** first. Shows how many foreclosures you would be competing with when you resell, and hides offers that have closed. |
 | **Price** | One-click searches for comps (Facebook Marketplace and groups, the listing sites), drafts of the most similar listings it already has, and a **paste reader** that tells resale, new, pasalo, and foreclosed listings apart and fills in their numbers. Works out a **pasalo's real price** (cash-out + what is still owed, checked against the loan terms). Suggests an ARV from resale comps, with new units as the ceiling and foreclosures as the floor. |
 | **Cost** | Renovation items with a contingency, holding costs, one-time costs (eviction, back dues), loan offers or cash, and Philippine costs: 6% capital gains tax on the highest of sale price, zonal value, or fair market value; about 2.5% buying costs; 3% broker. A business tax mode for habitual flippers. |
 | **Decide** | A **verdict against your own rules** (minimum profit, minimum yearly return, a walk-away price), net profit and both ROIs, what happens if things go wrong (Conservative and Stress), your **walk-away bid** (max offer under Stress), break-even prices, which estimate matters most, and what-ifs. |
@@ -28,15 +51,7 @@ bid. Verdict: don't bid, unless the unit turns out to be finished already.*
 
 It runs on your own computer; your deals stay in a local Excel workbook.
 
-## How to use it, step by step
-
-The screenshots follow the Jade Residences townhouse from the top. For a
-longer walkthrough of finding a listing and its comps, see
-[docs/how-to-use.md](docs/how-to-use.md).
-
-### 1. Install and start
-
-Requires Python 3.11+. In the project folder:
+## How to use it
 
 ```bash
 python -m venv .venv
@@ -45,126 +60,69 @@ python -m venv .venv
 .venv\Scripts\python -m flip.web
 ```
 
-`flip.template` creates your workbook (`data/deals_input.xlsx`) once;
-`flip.web` opens the app in your browser at http://localhost:8501. (On
-macOS or Linux, use `.venv/bin/python`.) The app has three pages, in the
-order of a deal: **Market scan**, **Edit a house**, **Analyze a house**.
+**Step-by-step guide with screenshots: [docs/user-guide.md](docs/user-guide.md)**,
+following one real house from the market scan to the verdict. For finding a
+listing and its comps by hand, see [docs/how-to-use.md](docs/how-to-use.md).
 
-### 2. Refresh Pag-IBIG's listings (once a month)
+## A data science project
 
-![Refresh Pag-IBIG listings](docs/images/readme/01-refresh.png)
+Behind the app is a small end-to-end data project: collecting messy
+real-world listings, cleaning them, building features that make houses
+comparable, screening with transparent rules, keeping a human in the loop
+where judgment is needed, and validating every number.
 
-Pag-IBIG has no download button, so the app gives you a small snippet: open
-the auction site, choose the region and province, paste the snippet into
-the browser's console (F12), and it reads every city's listings and saves
-them to a file (about 10 minutes for Cavite). Upload that file and press
-**Import**. It only reads the pages; it never logs in or bids. Houses no
-longer listed are removed, and each house keeps its offer window.
+| Stage | What it does here |
+|---|---|
+| **Collect** | A browser snippet that reads Pag-IBIG's auction site (1,538 Cavite properties in one run, 1,482 of them houses), public listings from FazWaz, and comps pasted from Facebook and listing sites. Sites that block automated reading are searched by hand, not scraped. |
+| **Clean** | Removes repeated listings (same link, or the same city, kind, price, and size; but never two Pag-IBIG units with different property numbers), lots and condos, floor areas under 25 sqm, and prices per sqm outside ₱10,000–150,000. A pasalo's cash-out is converted to a full price or left out. |
+| **Features** | Price per sqm; subdivision names matched across sources ("MICARA ESTATES TANZA PHASE 1" = "Micara Estates"); house type groups; a ±25% size window; how many foreclosures are for sale in each subdivision; offer windows. |
+| **Screen** | Transparent rules instead of a black box: compare like for like (same subdivision, similar size and type, resale before new), let new units elsewhere in a city only rule a house *out*, and flag a house at or below 70% of a fair comparison. |
+| **Human in the loop** | A rules-based reader classifies pasted listings. Every correction is logged, so its accuracy is measured, not assumed. |
+| **Model** | A cost waterfall with Philippine taxes, three scenarios, a sensitivity ranking (tornado chart), break-even prices, and a walk-away bid found by binary search. |
+| **Validate** | 247 automated tests, each checking hand-calculated numbers, never the code's own output, and the app tried on real listings. |
 
-### 3. Screen the foreclosures
+### What the data showed (Cavite, October 2026)
 
-![Market scan: every foreclosure, screened](docs/images/readme/02-market-scan.png)
+- **No foreclosure passed a fair comparison.** Of 1,170 screened houses,
+  the 9 that had similar houses in their own subdivision were priced at
+  85–115% of new units there: no room left for renovation, costs, and
+  profit.
+- **Resale prices, not foreclosures, are the bottleneck.** 598 houses had no
+  fair comparison at all, because resale prices in their subdivisions simply
+  aren't online.
+- **Supply is concentrated.** Tanza (532 houses) and Naic (360) hold most of
+  the Pag-IBIG stock; one Tanza subdivision had 137 units for sale at once.
+  A flipper there would resell against the seller's own cheaper stock.
+- **The sale price decides every deal.** In both real screenings below,
+  the after-repair value moved the profit more than any other input, and the
+  first guess, taken from new-unit prices, was too high.
 
-Every foreclosure gets one of three results:
+So far the answer to the question above is: **rarely, at Pag-IBIG's
+minimum bids.** The houses that might work are those already in good
+condition, where the renovation is small.
 
-- **Worth a closer look**: at or below 70% of similar houses.
-- **Little room**: close to what similar houses cost, even new ones. Skip.
-- **No fair comparison**: cheaper than new units elsewhere in the city, but
-  there is nothing similar to compare it with yet. Collect resale prices
-  from its subdivision first.
+## Two real screenings
 
-Filter by city, unoccupied, open offers, price, and how many are for sale
-in the same subdivision (your competition when you resell). Jade showed
-*no fair comparison*: the only prices the data had were new units.
+**Jade Residences, Imus** (the house in the user guide): 42.5 sqm, minimum
+bid ₱1,184,220, unoccupied. As a bare shell needing about ₱313,000 of work,
+it earns ₱87,554 paying cash and loses ₱190,688 if things go badly; the
+walk-away bid is ₱998,182. It meets the rules only if it needs about
+₱100,000 of work or less.
 
-### 4. Start a deal
+**An occupied townhouse in Imus**: 92 sqm, minimum bid ₱2,267,730, title
+still under consolidation. Replacing each guess with researched numbers, one
+at a time (cash purchase):
 
-![Start a deal, with the ARV guide](docs/images/readme/03-start-a-deal.png)
+| Step | Change | Net profit |
+|---|---|---|
+| Start | All placeholder guesses | +543,577 |
+| 1 | ARV from 4 resale comps (median ₱34,750/sqm x 92 sqm = ₱3,197,000) | -5,153 |
+| 2 | Holding period 15 months (eviction case + renovation + sale) | -20,153 |
+| 3 | Monthly holding cost ₱4,000 | -5,153 |
+| 4 | Renovation ₱550,000 + legal costs for eviction ₱90,000 | **-115,153** |
 
-Pick the house; its price, size, and location are filled in. The **ARV
-guide** puts the subdivision's own prices first: new Jade units cost about
-₱43,480 per sqm (₱1,847,900 for this size), a *ceiling* for a renovated used
-unit. The city's new-unit median (₱2,833,333 here) is labeled as only a
-maximum, because those units are often in pricier subdivisions. **Add to my
-workbook** also adds the standard checklist and a Cash offer, so no loan is
-assumed.
-
-### 5. Fill in the house
-
-![Edit a house](docs/images/readme/04-edit-house.png)
-
-**Edit a house** has one tab per part of the deal: the house's numbers,
-renovations, other costs, loan offers, comps, and the checklist. One **Save
-changes** button saves only what you changed; the workbook is backed up
-first, and nothing is saved while it is open in Excel.
-
-### 6. Find comps
-
-![One-click searches](docs/images/readme/06-find-comps.png)
-
-**Find comps online** opens ready-made searches for the subdivision in your
-own browser, where you are logged in. **Draft from the market data** lists
-the most similar listings the app already has, to tick and add.
-
-![Paste a listing](docs/images/readme/07-paste-read.png)
-
-**Paste listings** reads a post's text (or several, separated by a `---`
-line). It says what kind of listing it looks like and shows the phrases that
-gave it away, then fills in the numbers it found. Only the fields you
-confirm are saved, never the pasted text, which can hold names and phone
-numbers. It also keeps score of how often its guesses were right.
-
-![Pasalo full price](docs/images/readme/08-pasalo-price.png)
-
-A **pasalo**'s listed price is only the cash-out. This Jade seller asked
-₱1.1M cash-out and said ₱400,000 was left on the loan, but 81 more payments
-of ₱17,000 at 24% a year come to about ₱679,075. The app shows both full
-prices and records the more cautious one.
-
-![Comps and the suggested ARV](docs/images/readme/05-comps.png)
-
-The **suggested ARV** is the median resale price per sqm × the house's floor
-area. With one resale comp it warns you: 3 to 5 make a steadier estimate.
-
-### 7. Renovation and payment
-
-![Renovation estimate](docs/images/readme/09-renovations.png)
-
-One row per item. Jade's ₱313,000 is a bare-shell estimate built from
-Philippine contractor cost guides (marked *estimate*, to replace with
-quotes); the app adds a 10% contingency. Add your loan offers next to the
-Cash row to compare them.
-
-### 8. Read the verdict
-
-The **Analyze a house** page starts with the verdict and the key figures
-(the image at the top of this page):
-
-- **Net profit**, **ROI on total cost** (is it a good deal?), and
-  **cash-on-cash ROI** (is it a good use of my money?).
-- **Stress profit**: if it sells 10% lower, renovation runs 25% over, and it
-  takes your worst-case months.
-- **Max offer (Stress)**: your walk-away bid. Jade's is ₱998,182, below the
-  ₱1,184,220 minimum bid.
-- **Break-even sale and purchase prices.**
-
-### 9. Understand the risk
-
-![If things go wrong, and what matters most](docs/images/readme/11-charts.png)
-
-**If things go wrong** shows the profit as planned and in two bad cases:
-Jade goes from ₱87,554 to −₱42,960 (Conservative) and −₱190,688 (Stress).
-**What matters most** shows which estimate swings the profit most: for Jade,
-the sale price. Selling for 10% less turns the profit into a loss, so more
-resale comps matter far more than getting the monthly dues exact. A
-**What-if** panel tries other numbers without saving them.
-
-### 10. Verify, then bid
-
-Work through the house's checklist (title, occupants, dues, flood risk,
-inspection...) and download the Excel report for your records. For Jade,
-the numbers pass your rules only if the unit needs about ₱100,000 of work or
-less, so the next step was its photos and a viewing, not a bid.
+The first ARV guess came from brand-new developer units; real resale comps
+were 16% lower, and that single input erased the profit.
 
 ## The math, checked by hand
 
@@ -204,28 +162,9 @@ Max offer: 200,000 profit         2,897,978      2,621,881      2,330,383
 ```
 
 A 5% lower sale price, a 10% renovation overrun, and a 2-month delay take
-the deal to break-even. To survive the Stress scenario, the offer should
-be at most ₱2,514,799, about ₱285,000 below asking.
-
-## Another real screening: an occupied Pag-IBIG house in Imus
-
-A 92 sqm townhouse in Imus, Cavite, at a Pag-IBIG public auction: minimum
-bid ₱2,267,730, occupied, title still under consolidation. Replacing each
-guess with researched numbers, one at a time (cash purchase):
-
-| Step | Change | Net profit |
-|---|---|---|
-| Start | All placeholder guesses | +543,577 |
-| 1 | ARV from 4 resale comps (median ₱34,750/sqm x 92 sqm = ₱3,197,000) | -5,153 |
-| 2 | Holding period 15 months (eviction case + renovation + sale) | -20,153 |
-| 3 | Monthly holding cost ₱4,000 | -5,153 |
-| 4 | Renovation ₱550,000 + legal costs for eviction ₱90,000 | **-115,153** |
-
-The first ARV guess came from brand-new developer units; real resale comps
-were 16% lower, and that single input erased the profit. Both real
-screenings teach the same lesson: the sale price estimate matters more than
-anything else, and comps of the right kind (resale, same type, nearby) are
-what make it believable.
+the deal to break-even. To survive the Stress scenario, the offer should be
+at most ₱2,514,799, about ₱285,000 below asking. (The US 70% rule of thumb
+would say ₱2,490,000.)
 
 ## Honest limits
 
@@ -348,7 +287,8 @@ src/flip/
 tests/             hand-calculated tests for every module
 data/              SAMPLE data (made up, labeled as such) and public market data
 docs/
-  how-to-use.md        a longer walkthrough, from listing to verdict
+  user-guide.md        the app, step by step, with screenshots
+  how-to-use.md        finding a listing and its comps by hand
   glossary.md          every finance term, explained with the anchor deal
   project-context.md   build order, decisions, and assumptions
 ```
@@ -397,12 +337,3 @@ docs/
 
 New to the finance terms (ARV, cash-on-cash ROI, zonal value, comps,
 pasalo)? See [docs/glossary.md](docs/glossary.md).
-
-## How this was built
-
-A learning and portfolio project, built with
-[Claude Code](https://claude.com/claude-code). I set the scope, the cost
-waterfall and ROI definitions, the Philippine cost assumptions, and the
-hand-calculated anchor deal, reviewed the calculation code, and tested the
-tool on real Pag-IBIG listings; Claude Code wrote most of the
-implementation and tests.

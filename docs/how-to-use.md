@@ -1,11 +1,12 @@
 # How to use: from a listing to a decision
 
-This walkthrough follows one house from the listing page to the verdict in
-the web app. Allow an hour or two for your first house; later ones are
-faster.
+This walkthrough follows one house from the listing page to the verdict,
+finding the listing and its comps by hand. Allow an hour or two for your
+first house; later ones are faster. For a quicker tour of the app, see the
+[user guide](user-guide.md).
 
-You need the project set up once (see [Getting started](../README.md#getting-started))
-and Excel to fill in the input workbook.
+You need the project set up once (see the
+[user guide, step 1](user-guide.md#1-install-and-start)).
 
 > The analyzer checks a deal against your own criteria. It is not
 > investment advice, and its answers are only as good as the numbers you
@@ -203,8 +204,6 @@ button. The app saves into this same workbook, checked and backed up
 first, so you can switch between Excel and the app; close the workbook in
 Excel before saving in the app.
 
-![The input workbook](images/how-to-use/03-workbook.png)
-
 ---
 
 ## Step 4: Fill in Properties
@@ -224,8 +223,6 @@ on every sheet.
 | zonal_value | Optional: BIR zonal value per sqm x lot area |
 | source_url | The listing link |
 
-![The Properties sheet](images/how-to-use/04-properties.png)
-
 ---
 
 ## Step 5: Renovations, Other costs, and Loan offers
@@ -238,7 +235,7 @@ on every sheet.
 - **Loan offers:** one row per way of paying. Add a `Cash` row with `0%`
   in every rate column to compare. Type rates with the `%` sign.
 
-![Renovations, Other costs, and Loan offers](images/how-to-use/05-costs-and-loans.png)
+![Renovation items in the app (the same as the workbook's Renovations sheet)](images/readme/09-renovations.png)
 
 ---
 
@@ -249,7 +246,7 @@ One row per comp from Step 2. Two columns matter most:
   times your house's floor area
 - **kind**: `resale`, `new`, `foreclosed`, or `pasalo`
 
-![The Comps sheet](images/how-to-use/06-comps.png)
+![Comps in the app (the workbook's Comps sheet has the same columns)](images/readme/05-comps.png)
 
 ---
 
@@ -263,8 +260,6 @@ One row per comp from Step 2. Two columns matter most:
 
 Save the workbook.
 
-![The Checklist sheet](images/how-to-use/07-checklist.png)
-
 ---
 
 ## Step 8: Start the web app
@@ -277,7 +272,7 @@ It opens in your browser at http://localhost:8501. Pick your house at the
 top. If anything in the workbook is mistyped, the app lists each problem
 with the sheet and row to fix.
 
-![The verdict and key numbers](images/how-to-use/08-app-verdict.png)
+![The verdict and key numbers](images/readme/10-verdict.png)
 
 ---
 
@@ -308,7 +303,7 @@ with the sheet and row to fix.
 **Is the sale price realistic?** compares your ARV with what your comps
 suggest, and warns about weak comps.
 
-![The charts](images/how-to-use/09-app-charts.png)
+![The charts](images/readme/11-charts.png)
 
 ---
 
@@ -320,8 +315,6 @@ your workbook is never changed. Good first questions:
 - *What if it sells for less?* Lower the ARV to the low end of your comps.
 - *What if the eviction drags on?* Raise the holding months.
 
-![A what-if](images/how-to-use/10-what-if.png)
-
 ---
 
 ## Step 11: Download the Excel report
@@ -330,8 +323,6 @@ The sidebar's **Download the Excel report** button saves every house's
 analysis, including any what-if numbers, with sheets for the summary,
 cost waterfall, scenarios, what matters most, ARV check, inputs, and
 checklist.
-
-![The Excel report](images/how-to-use/11-excel-report.png)
 
 ---
 
