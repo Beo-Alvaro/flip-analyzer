@@ -301,7 +301,8 @@ def draft_from_market(columns, blocked: bool) -> list[dict]:
         "add": True, "kind": drafts["kind"], "match": drafts["match"],
         "subdivision": drafts["subdivision"], "type": drafts["type"],
         "floor_area_sqm": drafts["floor_area_sqm"], "price": drafts["price"],
-        "price_per_sqm": drafts["price"] / drafts["floor_area_sqm"], "link": drafts["link"]})
+        "price_per_sqm": (drafts["price"] / drafts["floor_area_sqm"]).round(0),
+        "link": drafts["link"]})
     edited = st.data_editor(
         table, hide_index=True, width="stretch", key=key("drafts"),
         disabled=[c for c in table.columns if c != "add"],

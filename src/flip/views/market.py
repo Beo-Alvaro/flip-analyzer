@@ -178,7 +178,8 @@ if max_supply is not None:
 st.caption(f"{len(view)} of {len(compared)} foreclosures match. Screen: at or below 70% of "
            "similar houses is worth a closer look; no fair comparison means collect resale "
            "prices from that subdivision first.")
-shown = view.assign(screen=view["screen"].map(SHORT))
+shown = view.assign(screen=view["screen"].map(SHORT),
+                   price_per_sqm=view["price_per_sqm"].round(0))  # whole pesos
 columns = {
     "city": "City", "subdivision": "Subdivision", "type": "Type", "price": "Price (PHP)",
     "price_basis": "Price basis", "floor_area_sqm": "Floor sqm", "price_per_sqm": "Per sqm",

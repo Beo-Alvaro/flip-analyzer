@@ -77,6 +77,9 @@ def build_deals(properties: pd.DataFrame, renovations: pd.DataFrame,
     no_offer = deals["offer"].isna()
     deals.loc[no_offer, "offer"] = DEFAULT_TERMS
     for column in LOAN_COLUMNS:
+        # Rates are decimals even when every offer is Cash (0, 0, 0): Excel stores
+        # those as whole numbers, and a 0.70 default can't go into a whole-number column.
+        deals[column] = deals[column].astype(float) if column in deals else float("nan")
         deals.loc[no_offer, column] = ANALYZE_DEFAULTS[column]
     return deals
 

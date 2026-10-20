@@ -108,6 +108,23 @@ def test_house_without_loan_offers_gets_labeled_default_terms():
     assert analyzed.loc[0, "net_profit"] == money(304_200)  # default terms = anchor terms
 
 
+def test_cash_only_offers_read_as_whole_numbers():
+    # Excel stores Cash's 0 / 0 / 0 as whole numbers, so pandas reads the loan
+    # columns as integers. With every house on such offers there is no blank to
+    # make them decimals, and filling in the 70% default must still work.
+    cash = pd.DataFrame({"deal_id": ["anchor"], "offer": ["Cash"], "loan_ratio": [0],
+                         "annual_interest_rate": [0], "loan_fee_rate": [0]})
+    analyzed = analyze_deals(build_deals(PROPERTIES, RENOVATIONS, cash))
+    assert analyzed.loc[0, "net_profit"] == money(412_000)  # as the Cash row above
+
+    properties = pd.concat([PROPERTIES, PROPERTIES.assign(deal_id="second")],
+                           ignore_index=True)
+    analyzed = analyze_deals(build_deals(properties, RENOVATIONS, cash)).set_index("deal_id")
+    assert (analyzed.loc["second", "offer"], analyzed.loc["second", "loan_ratio"]) == (
+        "default terms", 0.70)
+    assert analyzed.loc["second", "net_profit"] == money(754_200)  # anchor terms, no items
+
+
 def test_house_without_renovation_items_has_zero_renovation():
     no_items = RENOVATIONS.iloc[0:0]
     analyzed = analyze_deals(build_deals(PROPERTIES, no_items, LOAN_OFFERS))

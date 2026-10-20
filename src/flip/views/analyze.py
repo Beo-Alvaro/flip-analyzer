@@ -161,8 +161,9 @@ theme = getattr(st.context, "theme", None)
 dark = bool(theme is not None and theme.type == "dark")
 inputs_o = deal_inputs(o)
 scenarios = run_scenarios(inputs_o, worst_months(o))
+# Whole pesos, rounded like the figures above (the chart would round 87,554.5 up)
 scenario_table = pd.DataFrame({"scenario": list(scenarios),
-                               "net_profit": [r["net_profit"] for r in scenarios.values()]})
+                               "net_profit": [round(r["net_profit"]) for r in scenarios.values()]})
 table = sensitivity(inputs_o)
 
 left, right = st.columns(2)
